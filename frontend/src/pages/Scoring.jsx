@@ -305,11 +305,26 @@ export default function Scoring() {
                      )}
                   </div>
                   
-                  {activeInningsScore.target && !isMatchComplete && (
-                    <div className="w-full mt-2 text-center text-sm text-yellow-500 font-bold bg-yellow-900/20 py-1 rounded">
-                       Requires {activeInningsScore.target - activeInningsScore.runs} runs off {(fixture.total_overs * 6) - activeInningsScore.balls_bowled} balls
-                    </div>
-                  )}
+                  {activeInningsScore.target && !isMatchComplete && (() => {
+                     const runsNeeded = activeInningsScore.target - activeInningsScore.runs;
+                     const totalBalls = fixture.total_overs * 6;
+                     const ballsLeft = totalBalls - activeInningsScore.balls_bowled;
+                     const crr = activeInningsScore.balls_bowled > 0 ? ((activeInningsScore.runs / activeInningsScore.balls_bowled) * 6).toFixed(2) : "0.00";
+                     const rrr = ballsLeft > 0 ? ((runsNeeded / ballsLeft) * 6).toFixed(2) : "N/A";
+                     
+                     return (
+                        <div className="w-full mt-3 flex flex-col items-center">
+                            <div className="w-full text-center text-[15px] text-yellow-400 font-black bg-yellow-900/20 border-t border-b border-yellow-800/50 py-2 uppercase tracking-wide">
+                               Need {Math.max(0, runsNeeded)} runs in {Math.max(0, ballsLeft)} balls
+                            </div>
+                            <div className="flex gap-4 text-xs font-bold text-gray-400 uppercase tracking-widest mt-2">
+                               <span>CRR: {crr}</span>
+                               <span className="text-gray-700">|</span>
+                               <span>RRR: {rrr}</span>
+                            </div>
+                        </div>
+                     );
+                  })()}
                </>
              ) : (
                <div className="text-gray-500">No active innings</div>

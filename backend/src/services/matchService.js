@@ -192,7 +192,62 @@ class MatchService {
                 });
             } else if (updatedScore.innings === 2) {
                 await supabase.from('fixtures').update({ status: 'completed', match_end_time: new Date().toISOString() }).eq('id', fixtureId);
-                // Points calculation or summary handling can occur via separate crons.
+                
+                // --- Event-Driven Final Generation ---
+                try {
+                    const { data: currentFixture } = await supabase.from('fixtures').select('*').eq('id', fixtureId).single();
+                    
+                    if (currentFixture.match_type === 'Semifinal') {
+                        // Rank 1 vs Winner of 'Semifinal'
+                        const TournamentService = require('./tournamentService');
+                        const table = await TournamentService.getPointsTable(currentFixture.tournament_id);
+                        if (table.length > 0) {
+                            const rank1 = table[0].team_id;
+                            const { data: inn1 } = await supabase.from('match_scores').select('*').eq('fixture_id', fixtureId).eq('innings', 1).single();
+                            const target = inn1.runs + 1;
+                            const winnerId = (updatedScore.runs >= target) ? updatedScore.team_id : inn1.team_id;
+                            
+                            await supabase.from('fixtures').insert({
+                                team_a_id: rank1,
+                                team_b_id: winnerId,
+                                total_overs: currentFixture.total_overs, // Inherit playoff overs
+                                status: 'upcoming',
+                                tournament_id: currentFixture.tournament_id,
+                                match_type: 'Final'
+                            });
+                        }
+                    } else if (currentFixture.match_type === 'SF1' || currentFixture.match_type === 'SF2') {
+                        // 2 Semis scenario. Check if BOTH are completed!
+                        const { data: sfs } = await supabase.from('fixtures').select('*')
+                             .eq('tournament_id', currentFixture.tournament_id)
+                             .in('match_type', ['SF1', 'SF2']);
+                        
+                        if (sfs && sfs.length === 2 && sfs[0].status === 'completed' && sfs[1].status === 'completed') {
+                            const winners = [];
+                            for (let sf of sfs) {
+                                 const { data: s_inn1 } = await supabase.from('match_scores').select('*').eq('fixture_id', sf.id).eq('innings', 1).single();
+                                 const { data: s_inn2 } = await supabase.from('match_scores').select('*').eq('fixture_id', sf.id).eq('innings', 2).single();
+                                 if (s_inn2.runs > s_inn1.runs) winners.push(s_inn2.team_id);
+                                 else winners.push(s_inn1.team_id);
+                            }
+                            
+                            // Prevent duplicating "Final" if somehow generated
+                            const { data: existingFinal } = await supabase.from('fixtures').select('id').eq('tournament_id', currentFixture.tournament_id).eq('match_type', 'Final');
+                            if (!existingFinal || existingFinal.length === 0) {
+                                await supabase.from('fixtures').insert({
+                                    team_a_id: winners[0],
+                                    team_b_id: winners[1],
+                                    total_overs: currentFixture.total_overs,
+                                    status: 'upcoming',
+                                    tournament_id: currentFixture.tournament_id,
+                                    match_type: 'Final'
+                                });
+                            }
+                        }
+                    }
+                } catch (e) {
+                     console.error("Auto Final Generation Failed: ", e);
+                }
             }
         }
 

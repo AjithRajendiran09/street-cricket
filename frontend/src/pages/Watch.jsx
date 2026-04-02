@@ -124,17 +124,26 @@ export default function Watch() {
                   </div>
                </div>
 
-               {activeInningsScore.target && !isMatchComplete && (
-                  <div className="mt-4 w-full bg-yellow-900/30 border border-yellow-700 p-4 rounded-lg flex flex-col md:flex-row justify-between items-center text-center gap-4">
-                      <div className="text-lg text-yellow-500 font-bold uppercase tracking-widest">
-                         Need {activeInningsScore.target - activeInningsScore.runs} off {(fixture.total_overs * 6) - activeInningsScore.balls_bowled}
+               {activeInningsScore.target && !isMatchComplete && (() => {
+                  const runsNeeded = activeInningsScore.target - activeInningsScore.runs;
+                  const totalBalls = fixture.total_overs * 6;
+                  const ballsLeft = totalBalls - activeInningsScore.balls_bowled;
+                  const crr = activeInningsScore.balls_bowled > 0 ? ((activeInningsScore.runs / activeInningsScore.balls_bowled) * 6).toFixed(2) : "0.00";
+                  const rrr = ballsLeft > 0 ? ((runsNeeded / ballsLeft) * 6).toFixed(2) : "N/A";
+
+                  return (
+                  <div className="mt-4 w-full bg-yellow-900/30 border border-yellow-700 p-4 rounded-lg flex flex-col justify-center items-center text-center gap-2 shadow-inner">
+                      <div className="text-xl text-yellow-500 font-bold uppercase tracking-widest text-shadow">
+                         Need {Math.max(0, runsNeeded)} runs in {Math.max(0, ballsLeft)} balls
                       </div>
-                      <div className="bg-black px-4 py-2 rounded text-sm text-yellow-600 font-bold flex gap-4">
-                         <span>Target: {activeInningsScore.target}</span>
-                         <span>RRR: {getRRR(activeInningsScore.target, activeInningsScore.runs, fixture.total_overs*6, activeInningsScore.balls_bowled)}</span>
+                      <div className="bg-black/50 px-4 py-2 rounded text-sm text-yellow-600 font-bold flex gap-4 tracking-widest mt-1">
+                         <span>CRR: {crr}</span>
+                         <span className="text-gray-700">|</span>
+                         <span>RRR: {rrr}</span>
                       </div>
                   </div>
-               )}
+                  );
+               })()}
 
                {isMatchComplete && (
                   <div className="mt-6 w-full bg-cricket-lightGreen/20 border border-cricket-green py-4 px-6 rounded-lg text-center font-bold text-xl uppercase tracking-widest text-green-400">

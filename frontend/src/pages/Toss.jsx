@@ -29,7 +29,7 @@ export default function Toss() {
           setStep('completed');
         } else if (data.status === 'live' || data.status === 'completed') {
           // Prevent ghost-tosses if user navigated back via browser history
-          navigate(`/scoring/${fixtureId}`);
+          navigate(`/admin/scoring/${fixtureId}`);
         }
       })
       .catch(err => console.error(err));
@@ -83,7 +83,7 @@ export default function Toss() {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
       });
       if (res.ok) {
-        navigate(`/scoring/${fixtureId}`);
+        navigate(`/admin/scoring/${fixtureId}`);
       } else {
         const err = await res.json();
         showError("Error: " + err.error);

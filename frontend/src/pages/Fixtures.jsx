@@ -17,7 +17,13 @@ export default function Fixtures({ isAdminMode = false }) {
     if (!activeTournamentId) return;
     try {
       const res = await fetch(`${API_BASE}/tournament/fixtures?tournament_id=${activeTournamentId}`);
+      if (!res.ok) throw new Error("Failed to load Fixtures API.");
       const data = await res.json();
+      
+      // Explicit Fixture Ordering: Live First, then Upcoming, then Completed!
+      const priority = { 'live': 1, 'toss': 2, 'upcoming': 3, 'completed': 4, 'super_over': 1 };
+      data.sort((a,b) => (priority[a.status] || 5) - (priority[b.status] || 5));
+      
       setFixtures(data);
     } catch (err) {
       console.error(err);

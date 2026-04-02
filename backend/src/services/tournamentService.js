@@ -143,7 +143,7 @@ class TournamentService {
 
         const playoffs = [];
 
-        if (numTeams === 4) {
+        if (numTeams <= 4) {
             playoffs.push({ label: 'Final', team_a: table[0].team_id, team_b: table[1].team_id });
         } else if (numTeams === 5) {
             playoffs.push({ label: 'Semifinal', team_a: table[1].team_id, team_b: table[2].team_id });
