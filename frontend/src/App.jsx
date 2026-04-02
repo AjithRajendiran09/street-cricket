@@ -68,9 +68,9 @@ function App() {
             <Play size={20} />
             <span className="text-[10px] mt-1 uppercase">Live</span>
           </Link>
-          <Link to="/teams" className="flex flex-col items-center p-2 text-gray-400 hover:text-cricket-accent transition">
-            <Users size={20} />
-            <span className="text-[10px] mt-1 uppercase">Teams</span>
+          <Link to="/admin/leagues" className="flex flex-col items-center p-2 text-yellow-600 hover:text-yellow-400 transition relative">
+            <ShieldAlert size={20} className="drop-shadow-md" />
+            <span className="text-[10px] mt-1 uppercase font-bold tracking-widest">Admin</span>
           </Link>
           <Link to="/fixtures" className="flex flex-col items-center p-2 text-gray-400 hover:text-cricket-accent transition">
             <Calendar size={20} />
