@@ -1,9 +1,10 @@
 const express = require('express');
 const supabase = require('../db/supabase');
+const { isAdmin } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-router.post('/', async (req, res) => {
+router.post('/', isAdmin, async (req, res) => {
     try {
         const { team_name, player1_name, player2_name, player3_name, tournament_id } = req.body;
         
@@ -32,7 +33,7 @@ router.post('/', async (req, res) => {
     }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', isAdmin, async (req, res) => {
     try {
         const { team_name, player1_name, player2_name, player3_name, tournament_id } = req.body;
         
@@ -75,7 +76,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', isAdmin, async (req, res) => {
     try {
         const { error } = await supabase
             .from('teams')

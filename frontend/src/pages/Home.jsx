@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
-export default function Home() {
+export default function Home({ isAdminMode = false }) {
   const [tournaments, setTournaments] = useState([]);
   const [form, setForm] = useState({ name: '', ground: '' });
   const [activeId, setActiveId] = useState(localStorage.getItem('active_tournament') || '');
@@ -21,7 +21,10 @@ export default function Home() {
     try {
       const res = await fetch(`${API_BASE}/tournament/create`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
         body: JSON.stringify(form)
       });
       const data = await res.json();
@@ -42,7 +45,10 @@ export default function Home() {
     if (!window.confirm(`Are you absolutely sure you want to permanently delete the season "${name}" and all of its matches and teams? This cannot be undone.`)) return;
 
     try {
-      const res = await fetch(`${API_BASE}/tournament/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/tournament/${id}`, { 
+           method: 'DELETE',
+           headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
+      });
       if (res.ok) {
         setTournaments(tournaments.filter(t => t.id !== id));
         if (activeId === id) {
@@ -61,7 +67,11 @@ export default function Home() {
   const selectTournament = (id) => {
     setActiveId(id);
     localStorage.setItem('active_tournament', id);
-    navigate('/teams');
+    if (isAdminMode) {
+       navigate('/admin/teams');
+    } else {
+       navigate('/fixtures');
+    }
   };
 
   return (
@@ -76,24 +86,26 @@ export default function Home() {
       <div className="w-full max-w-3xl bg-cricket-card p-8 rounded-2xl border border-gray-800 shadow-2xl mt-12 z-10">
          <h2 className="text-2xl font-bold text-white uppercase tracking-widest border-b border-gray-700 pb-4 mb-6">Select Active Season</h2>
          
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Create New */}
-            <div className="bg-black/60 p-6 rounded-xl border border-gray-700 shadow-inner">
-               <h3 className="text-lg font-bold text-cricket-lightGreen uppercase tracking-widest mb-4">Start New Tournament</h3>
-               <form onSubmit={handleCreate} className="space-y-4 text-left">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Tournament Name *</label>
-                    <input required placeholder="e.g. Summer Bash 2026" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded p-3 text-white focus:border-cricket-lightGreen focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Ground / Turf</label>
-                    <input value={form.ground} onChange={e => setForm({...form, ground: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded p-3 text-white focus:border-cricket-lightGreen focus:outline-none" placeholder="e.g. Main Street Turf" />
-                  </div>
-                  <button type="submit" className="w-full bg-cricket-lightGreen hover:bg-green-600 text-white font-bold py-3 rounded-lg uppercase tracking-wider transition shadow-[0_0_15px_rgba(34,197,94,0.4)]">Launch Event</button>
-               </form>
-            </div>
+         <div className={`grid grid-cols-1 ${isAdminMode ? 'md:grid-cols-2' : ''} gap-8`}>
+            {/* Create New - ADMIN ONLY */}
+            {isAdminMode && (
+               <div className="bg-black/60 p-6 rounded-xl border border-gray-700 shadow-[0_0_20px_rgba(34,197,94,0.1)]">
+                  <h3 className="text-lg font-bold text-cricket-lightGreen uppercase tracking-widest mb-4">Start New Tournament</h3>
+                  <form onSubmit={handleCreate} className="space-y-4 text-left">
+                     <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Tournament Name *</label>
+                       <input required placeholder="e.g. Summer Bash 2026" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded p-3 text-white focus:border-cricket-lightGreen focus:outline-none" />
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Ground / Turf</label>
+                       <input value={form.ground} onChange={e => setForm({...form, ground: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded p-3 text-white focus:border-cricket-lightGreen focus:outline-none" placeholder="e.g. Main Street Turf" />
+                     </div>
+                     <button type="submit" className="w-full bg-cricket-lightGreen hover:bg-green-600 text-white font-bold py-3 rounded-lg uppercase tracking-wider transition shadow-[0_0_15px_rgba(34,197,94,0.4)]">Launch Event</button>
+                  </form>
+               </div>
+            )}
 
-            {/* Load Existing */}
+            {/* Load Existing - PUBLIC or ADMIN */}
             <div className="bg-black/60 p-6 rounded-xl border border-gray-700 shadow-inner flex flex-col pt-6">
                <h3 className="text-lg font-bold text-cricket-accent uppercase tracking-widest mb-4">Load Existing History</h3>
                <div className="space-y-3 overflow-y-auto flex-1 max-h-64 pr-2 custom-scrollbar">
@@ -107,9 +119,11 @@ export default function Home() {
                           </div>
                           {activeId === t.id && <span className="font-black text-xl mr-2">✓</span>}
                        </button>
-                       <button onClick={(e) => handleDeleteTournament(e, t.id, t.name)} className="absolute top-1/2 -translate-y-1/2 right-4 p-2 bg-red-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition shadow-lg hover:bg-red-500 hover:scale-110 focus:opacity-100" title="Delete Tournament">
-                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinelinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                       </button>
+                       {isAdminMode && (
+                           <button onClick={(e) => handleDeleteTournament(e, t.id, t.name)} className="absolute top-1/2 -translate-y-1/2 right-4 p-2 bg-red-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition shadow-lg hover:bg-red-500 hover:scale-110 focus:opacity-100" title="Delete Tournament">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinelinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                           </button>
+                       )}
                      </div>
                   ))}
                </div>

@@ -133,7 +133,10 @@ export default function Scoring() {
     try {
       const res = await fetch(`${API_BASE}/matches/ball/${fixtureId}`, {
          method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
+         headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+         },
          body: JSON.stringify(payload)
       });
       const result = await res.json();
@@ -173,7 +176,10 @@ export default function Scoring() {
   const undoLastBall = async () => {
     if (navigator.vibrate) navigator.vibrate([30, 50, 30]); // Distinct undo vibration pattern
     try {
-      const res = await fetch(`${API_BASE}/matches/undo/${fixtureId}`, { method: 'POST' });
+      const res = await fetch(`${API_BASE}/matches/undo/${fixtureId}`, { 
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
+      });
       const result = await res.json();
       if (!res.ok) showError(result.error);
       else {

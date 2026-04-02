@@ -1,10 +1,11 @@
 const express = require('express');
 const MatchService = require('../services/matchService');
+const { isAdmin } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
 // Toss
-router.post('/toss/:id', async (req, res) => {
+router.post('/toss/:id', isAdmin, async (req, res) => {
     try {
         const { tossWinnerId, tossDecision } = req.body;
         const fixture = await MatchService.doToss(req.params.id, tossWinnerId, tossDecision);
@@ -15,7 +16,7 @@ router.post('/toss/:id', async (req, res) => {
 });
 
 // Start Match
-router.post('/start/:id', async (req, res) => {
+router.post('/start/:id', isAdmin, async (req, res) => {
     try {
         const fixture = await MatchService.startMatch(req.params.id);
         res.json(fixture);
@@ -25,7 +26,7 @@ router.post('/start/:id', async (req, res) => {
 });
 
 // Add Ball
-router.post('/ball/:id', async (req, res) => {
+router.post('/ball/:id', isAdmin, async (req, res) => {
     try {
         const payload = req.body; // runs_scored, is_wide, is_no_ball, is_wicket, wicket_type
         const result = await MatchService.addBall(req.params.id, payload);
@@ -36,7 +37,7 @@ router.post('/ball/:id', async (req, res) => {
 });
 
 // Undo Last Ball
-router.post('/undo/:id', async (req, res) => {
+router.post('/undo/:id', isAdmin, async (req, res) => {
     try {
         const result = await MatchService.undoLastBall(req.params.id);
         res.json(result);

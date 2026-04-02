@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
-export default function Fixtures() {
+export default function Fixtures({ isAdminMode = false }) {
   const [fixtures, setFixtures] = useState([]);
   const [loading, setLoading] = useState(false);
   const [leagueOvers, setLeagueOvers] = useState(2);
@@ -37,7 +37,10 @@ export default function Fixtures() {
     try {
       const res = await fetch(`${API_BASE}/tournament/generate-league`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+           'Content-Type': 'application/json',
+           'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
         body: JSON.stringify({ defaultOvers: leagueOvers, tournament_id: activeTournamentId })
       });
       if (res.ok) await fetchFixtures();
@@ -56,7 +59,10 @@ export default function Fixtures() {
     try {
       const res = await fetch(`${API_BASE}/tournament/generate-playoffs`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+           'Content-Type': 'application/json',
+           'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
         body: JSON.stringify({ playoffOvers: playoffOvers, tournament_id: activeTournamentId })
       });
       if (res.ok) await fetchFixtures();
@@ -71,13 +77,15 @@ export default function Fixtures() {
   };
 
   const renderAction = (f) => {
+    if (!isAdminMode) return null; // Public users cannot operate Matches
+
     switch (f.status) {
       case 'upcoming':
-        return <Link to={`/toss/${f.id}`} className="bg-cricket-accent hover:bg-yellow-600 text-black px-4 py-2 rounded text-sm font-bold w-full mb-2 text-center uppercase">Do Toss</Link>;
+        return <Link to={`/admin/toss/${f.id}`} className="bg-cricket-accent hover:bg-yellow-600 text-black px-4 py-2 rounded text-sm font-bold w-full mb-2 text-center uppercase">Do Toss</Link>;
       case 'toss':
-        return <Link to={`/toss/${f.id}`} className="bg-cricket-lightGreen hover:bg-green-600 text-white px-4 py-2 rounded text-sm font-bold w-full mb-2 text-center uppercase">Start Match</Link>;
+        return <Link to={`/admin/toss/${f.id}`} className="bg-cricket-lightGreen hover:bg-green-600 text-white px-4 py-2 rounded text-sm font-bold w-full mb-2 text-center uppercase">Start Match</Link>;
       case 'live':
-        return <Link to={`/scoring/${f.id}`} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-bold animate-pulse w-full mb-2 text-center uppercase">Score Live</Link>;
+        return <Link to={`/admin/scoring/${f.id}`} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-bold animate-pulse w-full mb-2 text-center uppercase">Score Live</Link>;
       case 'completed':
         return <span className="bg-gray-800 text-gray-400 px-4 py-2 rounded text-sm font-bold w-full mb-2 text-center uppercase select-none">Completed</span>;
       default:
@@ -92,24 +100,26 @@ export default function Fixtures() {
         <h1 className="text-3xl font-bold text-cricket-accent uppercase w-full md:w-auto text-center md:text-left mb-4 md:mb-0">Fixtures</h1>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-cricket-card p-4 rounded-xl border border-gray-800">
-          <div className="flex flex-col gap-2 p-2 relative">
-             <h3 className="font-bold text-lg mb-2 text-white">League Generation</h3>
-             <label className="text-sm text-gray-400">Total Overs per Match</label>
-             <input disabled={fixtures.length > 0} type="number" min="1" value={leagueOvers} onChange={e => setLeagueOvers(Number(e.target.value))} className="bg-black text-white p-2 rounded border border-gray-700 disabled:opacity-50" />
-             <button onClick={handleGenerateLeague} disabled={loading || fixtures.length > 0} className="mt-2 bg-cricket-green hover:bg-green-700 text-white p-2 rounded font-bold uppercase disabled:opacity-50 transition">
-               {fixtures.length > 0 ? 'League Locked 🔒' : 'Generate League Matches'}
-             </button>
+      {isAdminMode && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-cricket-card p-4 rounded-xl border border-gray-800">
+              <div className="flex flex-col gap-2 p-2 relative">
+                 <h3 className="font-bold text-lg mb-2 text-white">League Generation</h3>
+                 <label className="text-sm text-gray-400">Total Overs per Match</label>
+                 <input disabled={fixtures.length > 0} type="number" min="1" value={leagueOvers} onChange={e => setLeagueOvers(Number(e.target.value))} className="bg-black text-white p-2 rounded border border-gray-700 disabled:opacity-50" />
+                 <button onClick={handleGenerateLeague} disabled={loading || fixtures.length > 0} className="mt-2 bg-cricket-green hover:bg-green-700 text-white p-2 rounded font-bold uppercase disabled:opacity-50 transition">
+                   {fixtures.length > 0 ? 'League Locked 🔒' : 'Generate League Matches'}
+                 </button>
+              </div>
+              <div className="flex flex-col gap-2 p-2 relative">
+                 <h3 className="font-bold text-lg mb-2 text-white">Playoff Generation</h3>
+                 <label className="text-sm text-gray-400">Total Overs per Match</label>
+                 <input disabled={fixtures.some(f => f.match_type && f.match_type !== 'league' && f.match_type !== 'League')} type="number" min="1" value={playoffOvers} onChange={e => setPlayoffOvers(Number(e.target.value))} className="bg-black text-white p-2 rounded border border-gray-700 disabled:opacity-50" />
+                 <button onClick={handleGeneratePlayoffs} disabled={loading || fixtures.some(f => f.match_type && f.match_type !== 'league' && f.match_type !== 'League')} className="mt-2 bg-yellow-600 hover:bg-yellow-700 text-black p-2 rounded font-bold uppercase transition disabled:bg-gray-700 disabled:text-gray-500">
+                   {fixtures.some(f => f.match_type && f.match_type !== 'league' && f.match_type !== 'League') ? 'Playoffs Locked 🔒' : 'Generate Playoffs'}
+                 </button>
+              </div>
           </div>
-          <div className="flex flex-col gap-2 p-2 relative">
-             <h3 className="font-bold text-lg mb-2 text-white">Playoff Generation</h3>
-             <label className="text-sm text-gray-400">Total Overs per Match</label>
-             <input disabled={fixtures.some(f => f.match_type && f.match_type !== 'league' && f.match_type !== 'League')} type="number" min="1" value={playoffOvers} onChange={e => setPlayoffOvers(Number(e.target.value))} className="bg-black text-white p-2 rounded border border-gray-700 disabled:opacity-50" />
-             <button onClick={handleGeneratePlayoffs} disabled={loading || fixtures.some(f => f.match_type && f.match_type !== 'league' && f.match_type !== 'League')} className="mt-2 bg-yellow-600 hover:bg-yellow-700 text-black p-2 rounded font-bold uppercase transition disabled:bg-gray-700 disabled:text-gray-500">
-               {fixtures.some(f => f.match_type && f.match_type !== 'league' && f.match_type !== 'League') ? 'Playoffs Locked 🔒' : 'Generate Playoffs'}
-             </button>
-          </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {fixtures.length === 0 && <p className="text-gray-500 italic p-4">No fixtures created yet.</p>}

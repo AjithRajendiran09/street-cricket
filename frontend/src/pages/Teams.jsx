@@ -68,7 +68,10 @@ export default function Teams() {
 
       const res = await fetch(url, {
         method: method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
         body: JSON.stringify(payload)
       });
       if (res.ok) {
@@ -87,7 +90,10 @@ export default function Teams() {
   const handleDelete = async (team) => {
     if (!window.confirm(`Are you sure you want to completely delete "${team.team_name}" and remove them from the tournament?`)) return;
     try {
-      const res = await fetch(`${API_BASE}/teams/${team.id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/teams/${team.id}`, { 
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
+      });
       if (res.ok) {
          fetchTeams();
          if (editId === team.id) handleCancelEdit();

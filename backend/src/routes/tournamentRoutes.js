@@ -1,10 +1,11 @@
 const express = require('express');
 const TournamentService = require('../services/tournamentService');
 const supabase = require('../db/supabase');
+const { isAdmin } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-router.post('/generate-league', async (req, res) => {
+router.post('/generate-league', isAdmin, async (req, res) => {
     try {
         const { defaultOvers, tournament_id } = req.body;
         const fixtures = await TournamentService.generateLeagueFixtures(defaultOvers || 2, tournament_id);
@@ -14,7 +15,7 @@ router.post('/generate-league', async (req, res) => {
     }
 });
 
-router.post('/generate-playoffs', async (req, res) => {
+router.post('/generate-playoffs', isAdmin, async (req, res) => {
     try {
         const { playoffOvers, tournament_id } = req.body;
         const fixtures = await TournamentService.generatePlayoffs(playoffOvers || 3, tournament_id);
@@ -67,7 +68,7 @@ router.get('/fixtures/:id', async (req, res) => {
     }
 });
 
-router.post('/create', async (req, res) => {
+router.post('/create', isAdmin, async (req, res) => {
     try {
         const { name, ground } = req.body;
         const { data, error } = await supabase
@@ -141,7 +142,7 @@ router.get('/leaderboard', async (req, res) => {
     }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', isAdmin, async (req, res) => {
     try {
         const tournamentId = req.params.id;
 

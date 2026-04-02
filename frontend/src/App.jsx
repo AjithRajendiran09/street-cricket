@@ -9,7 +9,9 @@ import Watch from './pages/Watch';
 import Points from './pages/Points';
 import History from './pages/History';
 import Leaderboard from './pages/Leaderboard';
-import { Trophy, Users, Calendar, BarChart2, Clock, Play } from 'lucide-react';
+import Login from './pages/Login';
+import AdminLayout from './pages/AdminLayout';
+import { Trophy, Users, Calendar, BarChart2, Clock, Play, ShieldAlert } from 'lucide-react';
 
 function App() {
   return (
@@ -25,18 +27,28 @@ function App() {
                <Link to="/fixtures" className="hover:text-white transition">Fixtures</Link>
                <Link to="/points" className="hover:text-white transition">Points Table</Link>
                <Link to="/history" className="hover:text-white transition">History</Link>
-               <Link to="/leaderboard" className="hover:text-cricket-accent transition font-bold">Leaders</Link>
+               <Link to="/leaderboard" className="hover:text-white transition">Leaders</Link>
+               <Link to="/admin/leagues" className="hover:text-cricket-accent transition font-bold text-yellow-500 border border-yellow-500/50 px-2 rounded flex items-center gap-1 mx-2 focus:outline-none">🔒 ADMIN</Link>
             </div>
           </div>
         </header>
         
         <main className="flex-grow container mx-auto p-4 animate-fade-in pb-10">
           <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/teams" element={<Teams />} />
-            <Route path="/fixtures" element={<Fixtures />} />
-            <Route path="/toss/:fixtureId" element={<Toss />} />
-            <Route path="/scoring/:fixtureId" element={<Scoring />} />
+            <Route path="/login" element={<Login />} />
+            
+            {/* Admin Protected Architecture */}
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route path="leagues" element={<Home isAdminMode={true} />} />
+              <Route path="teams" element={<Teams />} />
+              <Route path="fixtures" element={<Fixtures isAdminMode={true} />} />
+              <Route path="toss/:fixtureId" element={<Toss />} />
+              <Route path="scoring/:fixtureId" element={<Scoring />} />
+            </Route>
+
+            {/* Public Viewing Read-Only */}
+            <Route path="/" element={<Home isAdminMode={false} />} />
+            <Route path="/fixtures" element={<Fixtures isAdminMode={false} />} />
             <Route path="/watch/:fixtureId" element={<Watch />} />
             <Route path="/points" element={<Points />} />
             <Route path="/history" element={<History />} />

@@ -55,7 +55,10 @@ export default function Toss() {
     try {
       const res = await fetch(`${API_BASE}/matches/toss/${fixtureId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
         body: JSON.stringify({ tossWinnerId, tossDecision: decision })
       });
       const data = await res.json();
@@ -75,7 +78,10 @@ export default function Toss() {
   const startMatch = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/matches/start/${fixtureId}`, { method: 'POST' });
+      const res = await fetch(`${API_BASE}/matches/start/${fixtureId}`, { 
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
+      });
       if (res.ok) {
         navigate(`/scoring/${fixtureId}`);
       } else {
