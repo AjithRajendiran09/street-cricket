@@ -16,8 +16,8 @@ class ScoringEngine {
         let newBallsBowled = balls_bowled;
         let newExtras = extras;
         
-        // Validation: cannot score if match/innings completed or wickets >= 2
-        if (state.is_completed || wickets >= 2 || balls_bowled >= total_overs * 6) {
+        // Validation: cannot score if match/innings completed or wickets >= 3
+        if (state.is_completed || wickets >= 3 || balls_bowled >= total_overs * 6) {
             throw new Error("Cannot add ball. Innings already completed.");
         }
 
@@ -53,8 +53,8 @@ class ScoringEngine {
         // Check if innings completed
         let isCompleted = false;
         
-        // 2 wickets -> innings ends. Street cricket rules from prompt: "innings ends when balls == total_overs * 6 OR wickets == 2"
-        if (newWickets >= 2 || newBallsBowled >= total_overs * 6) {
+        // 3 wickets -> innings ends. Street cricket rules explicitly requested 3 players batting
+        if (newWickets >= 3 || newBallsBowled >= total_overs * 6) {
             isCompleted = true;
         }
 

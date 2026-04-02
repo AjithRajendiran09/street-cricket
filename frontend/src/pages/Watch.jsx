@@ -70,6 +70,9 @@ export default function Watch() {
   const isMatchComplete = fixture.status === 'completed';
   const activeInningsScore = scores[2] && !scores[2].is_completed ? scores[2] : (scores[1] && !scores[1].is_completed ? scores[1] : (scores[2] || scores[1]));
   
+  // Calculate dynamic target safely since missing natively from DB pulls
+  const calculatedTarget = activeInningsScore?.innings === 2 && scores[1] ? scores[1].runs + 1 : null;
+  
   const getRR = (runs, balls) => balls > 0 ? (runs / (balls / 6)).toFixed(2) : "0.00";
   const getRRR = (target, runs, totalBalls, bowlsBowled) => {
       const runsNeeded = target - runs;
@@ -124,8 +127,8 @@ export default function Watch() {
                   </div>
                </div>
 
-               {activeInningsScore.target && !isMatchComplete && (() => {
-                  const runsNeeded = activeInningsScore.target - activeInningsScore.runs;
+               {calculatedTarget && !isMatchComplete && (() => {
+                  const runsNeeded = calculatedTarget - activeInningsScore.runs;
                   const totalBalls = fixture.total_overs * 6;
                   const ballsLeft = totalBalls - activeInningsScore.balls_bowled;
                   const crr = activeInningsScore.balls_bowled > 0 ? ((activeInningsScore.runs / activeInningsScore.balls_bowled) * 6).toFixed(2) : "0.00";
@@ -146,8 +149,14 @@ export default function Watch() {
                })()}
 
                {isMatchComplete && (
-                  <div className="mt-6 w-full bg-cricket-lightGreen/20 border border-cricket-green py-4 px-6 rounded-lg text-center font-bold text-xl uppercase tracking-widest text-green-400">
+                  <div className="mt-6 w-full bg-cricket-lightGreen/20 border border-cricket-green py-5 px-6 rounded-lg text-center font-bold text-xl uppercase tracking-widest text-green-400 relative overflow-hidden shadow-[0_0_30px_rgba(34,197,94,0.3)]">
                      {getResultString()}
+                     {fixture.match_type === 'Final' && (
+                        <div className="mt-6 animate-bounce">
+                           <div className="text-6xl drop-shadow-[0_0_20px_rgba(255,215,0,0.8)] mb-2">🏆</div>
+                           <div className="text-yellow-400 font-black text-2xl tracking-tighter">TOURNAMENT CHAMPIONS!</div>
+                        </div>
+                     )}
                   </div>
                )}
             </div>

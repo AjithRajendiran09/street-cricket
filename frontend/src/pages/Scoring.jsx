@@ -161,6 +161,7 @@ export default function Scoring() {
 
   const activeInningsScore = scores[2] && !scores[2].is_completed ? scores[2] : (scores[1] && !scores[1].is_completed ? scores[1] : (scores[2] || scores[1]));
   const activeInningsNum = activeInningsScore ? activeInningsScore.innings : 1;
+  const calculatedTarget = activeInningsScore?.innings === 2 && scores[1] ? scores[1].runs + 1 : null;
 
   const outPlayers = useMemo(() => {
      if (!balls || !activeInningsScore) return [];
@@ -258,8 +259,13 @@ export default function Scoring() {
            <h2 className="text-3xl font-black text-yellow-500 uppercase tracking-widest mb-4 flex items-center justify-center gap-3">
              <Trophy className="w-10 h-10 drop-shadow-md" /> Summary
            </h2>
-           <p className="text-xl font-bold text-white uppercase mb-8 bg-black/60 p-5 rounded-xl border border-gray-700 shadow-inner">
+           <p className="text-xl font-bold text-white uppercase mb-8 bg-black/60 p-5 rounded-xl border border-gray-700 shadow-inner tracking-widest flex flex-col items-center justify-center">
              {getMatchResult()}
+             {fixture.match_type === 'Final' && (
+                <span className="mt-4 text-sm bg-yellow-900 border border-yellow-500 text-yellow-400 px-4 py-2 rounded-lg animate-pulse flex items-center justify-center font-black">
+                   🌟 TOURNAMENT CHAMPIONS 🌟
+                </span>
+             )}
            </p>
            
            <div className="flex justify-between items-center gap-4 text-left">
@@ -297,16 +303,16 @@ export default function Scoring() {
                         <p className="text-gray-500 text-xs uppercase font-bold tracking-widest">Extras</p>
                         <p className="text-2xl font-bold text-white">{activeInningsScore.extras}</p>
                      </div>
-                     {activeInningsScore.target && (
+                     {calculatedTarget && (
                        <div className="flex-1 border-l border-gray-800 bg-gray-900/50 rounded-r">
                           <p className="text-gray-400 text-xs uppercase font-bold tracking-widest">Target</p>
-                          <p className="text-2xl font-bold text-yellow-400">{activeInningsScore.target}</p>
+                          <p className="text-2xl font-bold text-yellow-400">{calculatedTarget}</p>
                        </div>
                      )}
                   </div>
                   
-                  {activeInningsScore.target && !isMatchComplete && (() => {
-                     const runsNeeded = activeInningsScore.target - activeInningsScore.runs;
+                  {calculatedTarget && !isMatchComplete && (() => {
+                     const runsNeeded = calculatedTarget - activeInningsScore.runs;
                      const totalBalls = fixture.total_overs * 6;
                      const ballsLeft = totalBalls - activeInningsScore.balls_bowled;
                      const crr = activeInningsScore.balls_bowled > 0 ? ((activeInningsScore.runs / activeInningsScore.balls_bowled) * 6).toFixed(2) : "0.00";
