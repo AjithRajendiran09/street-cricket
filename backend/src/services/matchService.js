@@ -82,10 +82,15 @@ class MatchService {
             .from('fixtures')
             .update({ status: 'live', match_start_time: new Date().toISOString() })
             .eq('id', fixtureId)
-            .select()
+            .select(`
+                *,
+                team_a:team_a_id (team_name),
+                team_b:team_b_id (team_name)
+            `)
             .single();
 
         if (error) throw new Error(error.message);
+
         return data;
     }
 
@@ -187,7 +192,7 @@ class MatchService {
                 });
             } else if (updatedScore.innings === 2) {
                 await supabase.from('fixtures').update({ status: 'completed', match_end_time: new Date().toISOString() }).eq('id', fixtureId);
-                // Can trigger points calculation here or via cron
+                // Points calculation or summary handling can occur via separate crons.
             }
         }
 

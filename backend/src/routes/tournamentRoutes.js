@@ -68,6 +68,73 @@ router.get('/fixtures/:id', async (req, res) => {
     }
 });
 
+router.get('/player-stats', async (req, res) => {
+    try {
+        const { tournament_id } = req.query;
+        if (!tournament_id) return res.status(400).json({ error: "tournament_id is required" });
+
+        const { data: fixtures } = await supabase.from('fixtures').select('id').eq('tournament_id', tournament_id);
+        if (!fixtures || fixtures.length === 0) return res.json({ orangeCap: [], purpleCap: [] });
+
+        const fixtureIds = fixtures.map(f => f.id);
+        
+        // Batch fetch all historical balls recursively for these matches
+        const { data: balls, error: bErr } = await supabase.from('ball_by_ball').select('*').in('fixture_id', fixtureIds);
+        if (bErr) throw new Error(bErr.message);
+
+        const batters = {};
+        const bowlers = {};
+
+        balls.forEach(b => {
+             // Core Batting Analytics Generator
+             if (b.striker_name && b.striker_name.trim() !== '') {
+                 if (!batters[b.striker_name]) batters[b.striker_name] = { name: b.striker_name, runs: 0, balls: 0, fours: 0, sixes: 0 };
+                 if (!b.is_wide) {
+                     batters[b.striker_name].balls += 1;
+                     batters[b.striker_name].runs += (b.runs_scored || 0);
+                     if (b.runs_scored === 4) batters[b.striker_name].fours += 1;
+                     if (b.runs_scored === 6) batters[b.striker_name].sixes += 1;
+                 }
+             }
+
+             // Core Bowling Analytics Generator
+             if (b.bowler_name && b.bowler_name.trim() !== '') {
+                 if (!bowlers[b.bowler_name]) bowlers[b.bowler_name] = { name: b.bowler_name, wickets: 0, balls: 0, runs_conceded: 0, dots: 0 };
+                 bowlers[b.bowler_name].runs_conceded += (b.runs_scored || 0) + (b.extras || 0);
+
+                 if (!b.is_wide && !b.is_no_ball) {
+                     bowlers[b.bowler_name].balls += 1;
+                 }
+                 if (b.is_wicket && b.wicket_type !== 'run_out') { 
+                     bowlers[b.bowler_name].wickets += 1;
+                 }
+                 if ((b.runs_scored || 0) === 0 && !b.is_wide && !b.is_no_ball && (b.extras || 0) === 0 && !b.is_wicket) {
+                     bowlers[b.bowler_name].dots += 1;
+                 }
+             }
+        });
+
+        // Resolve, Sort, and Clean memory objects
+        const orangeCap = Object.values(batters)
+            .map(b => ({ ...b, strike_rate: b.balls > 0 ? ((b.runs / b.balls) * 100).toFixed(2) : "0.00" }))
+            .sort((a,b) => b.runs - a.runs || b.strike_rate - a.strike_rate)
+            .slice(0, 20);
+
+        const purpleCap = Object.values(bowlers)
+            .map(b => {
+                const overs = b.balls / 6;
+                const econ = overs > 0 ? (b.runs_conceded / overs).toFixed(2) : "0.00";
+                return { ...b, overs: Math.floor(b.balls/6) + "." + (b.balls%6), economy: econ };
+            })
+            .sort((a,b) => b.wickets - a.wickets || a.economy - b.economy)
+            .slice(0, 20);
+
+        res.json({ orangeCap, purpleCap });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 router.post('/create', isAdmin, async (req, res) => {
     try {
         const { name, ground } = req.body;

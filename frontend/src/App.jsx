@@ -9,9 +9,10 @@ import Watch from './pages/Watch';
 import Points from './pages/Points';
 import History from './pages/History';
 import Leaderboard from './pages/Leaderboard';
+import PlayerStats from './pages/PlayerStats';
 import Login from './pages/Login';
 import AdminLayout from './pages/AdminLayout';
-import { Trophy, Users, Calendar, BarChart2, Clock, Play, ShieldAlert } from 'lucide-react';
+import { Trophy, Users, Calendar, BarChart2, Clock, Play, ShieldAlert, Activity } from 'lucide-react';
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
                <Link to="/points" className="hover:text-white transition">Points Table</Link>
                <Link to="/history" className="hover:text-white transition">History</Link>
                <Link to="/leaderboard" className="hover:text-white transition">Leaders</Link>
+               <Link to="/stats" className="hover:text-white transition flex items-center gap-1"><Activity className="w-4 h-4 text-orange-400"/> Stats</Link>
                <Link to="/admin/leagues" className="hover:text-cricket-accent transition font-bold text-yellow-500 border border-yellow-500/50 px-2 rounded flex items-center gap-1 mx-2 focus:outline-none">🔒 ADMIN</Link>
             </div>
           </div>
@@ -53,6 +55,7 @@ function App() {
             <Route path="/points" element={<Points />} />
             <Route path="/history" element={<History />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/stats" element={<PlayerStats />} />
           </Routes>
         </main>
 
@@ -87,6 +90,10 @@ function App() {
           <Link to="/leaderboard" className="flex flex-col items-center p-2 text-gray-400 hover:text-cricket-accent transition">
             <BarChart2 size={20} />
             <span className="text-[10px] mt-1 uppercase">Leaders</span>
+          </Link>
+          <Link to="/stats" className="flex flex-col items-center p-2 text-gray-400 hover:text-cricket-accent transition">
+             <Activity size={20} className="text-orange-500"/>
+             <span className="text-[10px] mt-1 uppercase">Stats</span>
           </Link>
         </nav>
       </div>
