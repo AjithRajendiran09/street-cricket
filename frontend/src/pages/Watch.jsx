@@ -39,6 +39,11 @@ export default function Watch() {
   useEffect(() => {
     fetchMatchData();
 
+    // Aggressive REST Polling Fallback (Every 5 seconds)
+    const pollInterval = setInterval(() => {
+       fetchMatchData();
+    }, 5000);
+
     const scoresSub = supabase.channel('scores-watch')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'match_scores', filter: `fixture_id=eq.${fixtureId}` }, () => fetchMatchData())
       .subscribe();
@@ -52,6 +57,7 @@ export default function Watch() {
       .subscribe();
 
     return () => {
+      clearInterval(pollInterval);
       supabase.removeChannel(scoresSub);
       supabase.removeChannel(ballsSub);
       supabase.removeChannel(fixtureSub);
