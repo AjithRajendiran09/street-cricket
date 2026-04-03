@@ -168,6 +168,60 @@ class TournamentService {
 
         return inserted;
     }
+
+    static async generateFinal(playoffOvers = 3, tournament_id) {
+        if (!tournament_id) throw new Error("Tournament ID is required to generate Final");
+        
+        const { data: check } = await supabase.from('fixtures').select('id').eq('tournament_id', tournament_id).eq('match_type', 'Final');
+        if (check && check.length > 0) throw new Error("Final already exists!");
+
+        const { data: sfs } = await supabase.from('fixtures').select('*')
+                             .eq('tournament_id', tournament_id)
+                             .in('match_type', ['SF1', 'SF2', 'Semifinal']);
+                             
+        if (!sfs || sfs.length === 0) throw new Error("No Semifinals found to generate Final from.");
+
+        const getWinner = async (fixtureId) => {
+             const { data: s_inn1 } = await supabase.from('match_scores').select('*').eq('fixture_id', fixtureId).eq('innings', 1).single();
+             const { data: s_inn2 } = await supabase.from('match_scores').select('*').eq('fixture_id', fixtureId).eq('innings', 2).single();
+             if (!s_inn1 || !s_inn2) throw new Error("Match " + fixtureId + " is not fully completed.");
+             if (s_inn2.runs > s_inn1.runs) return s_inn2.team_id;
+             return s_inn1.team_id;
+        };
+
+        if (sfs.length === 1 && sfs[0].match_type === 'Semifinal') {
+             if (sfs[0].status !== 'completed') throw new Error("Semifinal is not completed yet!");
+             const sfWinnerId = await getWinner(sfs[0].id);
+             
+             const table = await this.getPointsTable(tournament_id);
+             const rank1 = table[0].team_id;
+             
+             const { data: inserted } = await supabase.from('fixtures').insert({
+                 team_a_id: rank1,
+                 team_b_id: sfWinnerId,
+                 total_overs: playoffOvers,
+                 status: 'upcoming',
+                 tournament_id,
+                 match_type: 'Final'
+             }).select();
+             return inserted;
+        } else if (sfs.length === 2) {
+             if (sfs[0].status !== 'completed' || sfs[1].status !== 'completed') throw new Error("Both SF1 and SF2 must be completed!");
+             const winner1 = await getWinner(sfs[0].id);
+             const winner2 = await getWinner(sfs[1].id);
+             
+             const { data: inserted } = await supabase.from('fixtures').insert({
+                 team_a_id: winner1,
+                 team_b_id: winner2,
+                 total_overs: playoffOvers,
+                 status: 'upcoming',
+                 tournament_id,
+                 match_type: 'Final'
+             }).select();
+             return inserted;
+        }
+        throw new Error("Unexpected playoff structure.");
+    }
 }
 
 module.exports = TournamentService;

@@ -82,6 +82,28 @@ export default function Fixtures({ isAdminMode = false }) {
     setLoading(false);
   };
 
+  const handleGenerateFinal = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/tournament/generate-final`, {
+        method: 'POST',
+        headers: { 
+           'Content-Type': 'application/json',
+           'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
+        body: JSON.stringify({ playoffOvers: playoffOvers, tournament_id: activeTournamentId })
+      });
+      if (res.ok) await fetchFixtures();
+      else {
+        const err = await res.json();
+        showError(err.error);
+      }
+    } catch (err) {
+      console.log(err);
+    }
+    setLoading(false);
+  };
+
   const renderAction = (f) => {
     if (!isAdminMode) return null; // Public users cannot operate Matches
 
@@ -119,10 +141,21 @@ export default function Fixtures({ isAdminMode = false }) {
               <div className="flex flex-col gap-2 p-2 relative">
                  <h3 className="font-bold text-lg mb-2 text-white">Playoff Generation</h3>
                  <label className="text-sm text-gray-400">Total Overs per Match</label>
-                 <input disabled={fixtures.some(f => f.match_type && f.match_type !== 'league' && f.match_type !== 'League')} type="number" min="1" value={playoffOvers} onChange={e => setPlayoffOvers(Number(e.target.value))} className="bg-black text-white p-2 rounded border border-gray-700 disabled:opacity-50" />
-                 <button onClick={handleGeneratePlayoffs} disabled={loading || fixtures.some(f => f.match_type && f.match_type !== 'league' && f.match_type !== 'League')} className="mt-2 bg-yellow-600 hover:bg-yellow-700 text-black p-2 rounded font-bold uppercase transition disabled:bg-gray-700 disabled:text-gray-500">
-                   {fixtures.some(f => f.match_type && f.match_type !== 'league' && f.match_type !== 'League') ? 'Playoffs Locked 🔒' : 'Generate Playoffs'}
-                 </button>
+                 <input disabled={fixtures.some(f => f.match_type === 'Final')} type="number" min="1" value={playoffOvers} onChange={e => setPlayoffOvers(Number(e.target.value))} className="bg-black text-white p-2 rounded border border-gray-700 disabled:opacity-50" />
+                 
+                 {!fixtures.some(f => ['SF1', 'SF2', 'Semifinal', 'Final'].includes(f.match_type)) ? (
+                     <button onClick={handleGeneratePlayoffs} disabled={loading} className="mt-2 bg-yellow-600 hover:bg-yellow-700 text-black p-2 rounded font-bold uppercase transition disabled:bg-gray-700 disabled:text-gray-500">
+                       Generate Playoffs
+                     </button>
+                 ) : fixtures.some(f => ['SF1', 'SF2', 'Semifinal'].includes(f.match_type)) && !fixtures.some(f => f.match_type === 'Final') ? (
+                     <button onClick={handleGenerateFinal} disabled={loading} className="mt-2 bg-yellow-500 hover:bg-yellow-400 text-black p-2 rounded font-black uppercase transition border-2 border-yellow-700 shadow-[0_0_15px_rgba(234,179,8,0.4)] hover:scale-[1.02]">
+                       Generate Final 🏆
+                     </button>
+                 ) : (
+                     <button disabled className="mt-2 bg-gray-800 text-gray-500 p-2 rounded font-bold uppercase transition">
+                       Playoffs Locked 🔒
+                     </button>
+                 )}
               </div>
           </div>
       )}

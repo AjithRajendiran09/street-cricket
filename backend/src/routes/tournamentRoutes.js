@@ -25,6 +25,16 @@ router.post('/generate-playoffs', isAdmin, async (req, res) => {
     }
 });
 
+router.post('/generate-final', isAdmin, async (req, res) => {
+    try {
+        const { playoffOvers, tournament_id } = req.body;
+        const fixtures = await TournamentService.generateFinal(playoffOvers || 3, tournament_id);
+        res.status(201).json(fixtures);
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
 router.get('/points-table', async (req, res) => {
     try {
         const { tournament_id } = req.query;
