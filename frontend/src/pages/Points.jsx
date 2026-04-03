@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import html2canvas from 'html2canvas';
+import { Download } from 'lucide-react';
+import jsPDF from 'jspdf';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
@@ -19,11 +22,29 @@ export default function Points() {
       .catch(err => console.error(err));
   }, []);
 
+  const exportPDF = () => {
+      const el = document.getElementById('points-export');
+      html2canvas(el, { scale: 2, backgroundColor: '#111827' }).then(canvas => {
+          const imgData = canvas.toDataURL('image/png');
+          const pdf = new jsPDF('p', 'mm', 'a4');
+          const w = pdf.internal.pageSize.getWidth();
+          const h = (canvas.height * w) / canvas.width;
+          pdf.addImage(imgData, 'PNG', 0, 0, w, h);
+          pdf.save('Points_Table.pdf');
+      });
+  };
+
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-cricket-accent uppercase border-b border-gray-700 pb-2">Points Table</h1>
+      <div className="flex justify-between items-center border-b border-gray-700 pb-2">
+         <h1 className="text-3xl font-bold text-cricket-accent uppercase">Points Table</h1>
+         <button onClick={exportPDF} className="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-lg flex items-center gap-2 text-sm font-bold uppercase transition flex-shrink-0">
+             <Download size={16} /> Export
+         </button>
+      </div>
       
-      <div className="bg-cricket-card rounded-xl border border-gray-800 overflow-x-auto shadow-2xl">
+      <div id="points-export" className="bg-cricket-card rounded-xl border border-gray-800 overflow-x-auto shadow-2xl p-2 pb-4">
+        <h2 className="text-white text-center font-black uppercase text-xl mb-4 hidden print:block pt-4">Official Points Table</h2>
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-black text-gray-400 text-xs tracking-widest uppercase font-black">

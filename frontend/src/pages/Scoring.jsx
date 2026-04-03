@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { Trophy } from 'lucide-react';
+import LivePlayerStats from '../components/LivePlayerStats';
+import FullScorecard from '../components/FullScorecard';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
@@ -299,6 +301,14 @@ export default function Scoring() {
               </div>
            </div>
 
+           <FullScorecard 
+               fixture={fixture} 
+               balls={balls} 
+               scores={scores} 
+               teamA={teamA} 
+               teamB={teamB} 
+            />
+
            <button onClick={() => navigate('/points')} className="mt-8 w-full bg-cricket-accent hover:bg-yellow-500 text-black font-black uppercase tracking-widest py-4 rounded-xl transition-all shadow-[0_0_15px_rgba(234,179,8,0.3)] hover:scale-105 focus:outline-none">
               View Points Table &gt;
            </button>
@@ -348,6 +358,13 @@ export default function Scoring() {
                         </div>
                      );
                   })()}
+                  
+                  <LivePlayerStats 
+                     balls={balls} 
+                     activeInningsNum={activeInningsNum} 
+                     currentStriker={currentStriker} 
+                     currentBowler={currentBowler} 
+                  />
                </>
              ) : (
                <div className="text-gray-500">No active innings</div>

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy } from 'lucide-react';
+import { Trophy, Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
@@ -35,9 +37,24 @@ export default function Leaderboard() {
       });
   }, [selectedFilter]);
 
+  const exportPDF = () => {
+      const el = document.getElementById('leaderboard-export');
+      html2canvas(el, { scale: 2, backgroundColor: '#111827' }).then(canvas => {
+          const imgData = canvas.toDataURL('image/png');
+          const pdf = new jsPDF('p', 'mm', 'a4');
+          const w = pdf.internal.pageSize.getWidth();
+          const h = (canvas.height * w) / canvas.width;
+          pdf.addImage(imgData, 'PNG', 0, 0, w, h);
+          pdf.save(`Tournament_${tab}.pdf`);
+      });
+  };
+
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-10">
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-black/40 p-6 rounded-2xl border border-gray-800 shadow-xl drop-shadow-xl mb-4">
+    <div className="space-y-6 max-w-4xl mx-auto pb-10 flex flex-col">
+       <button onClick={exportPDF} className="self-end bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-lg flex items-center gap-2 text-sm font-bold uppercase transition flex-shrink-0 shadow-lg">
+          <Download size={16} /> Export Leaderboard
+       </button>
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-black/40 p-6 rounded-2xl border border-gray-800 shadow-xl drop-shadow-xl mb-0">
          <h1 className="text-3xl font-black text-white uppercase flex items-center justify-center gap-3 w-full md:w-auto">
             <Trophy className="text-yellow-500 w-10 h-10" /> 
             Leaderboard
@@ -62,7 +79,8 @@ export default function Leaderboard() {
              <button onClick={() => setTab('bowlers')} className={`flex-1 py-4 text-center rounded-md font-black uppercase tracking-widest transition ${tab==='bowlers'?'bg-cricket-lightGreen text-white shadow-lg':'text-gray-400 hover:text-white hover:bg-gray-900'}`}>Top Bowlers</button>
           </div>
 
-          <div className="bg-cricket-card border border-gray-800 rounded-xl overflow-hidden shadow-2xl animate-fade-in">
+          <div id="leaderboard-export" className="bg-cricket-card p-2 border border-gray-800 rounded-xl overflow-hidden shadow-2xl animate-fade-in">
+            <h2 className="text-white text-center font-black uppercase text-2xl hidden print:block mb-4 pt-4">{tab === 'batters' ? 'Top Batsmen Leaderboard' : 'Top Bowlers Leaderboard'}</h2>
             {tab === 'batters' ? (
               <table className="w-full text-left text-white">
                 <thead className="bg-black border-b border-gray-800 text-gray-500 uppercase text-xs font-black tracking-widest">

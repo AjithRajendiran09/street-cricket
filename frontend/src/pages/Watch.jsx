@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../supabase';
+import LivePlayerStats from '../components/LivePlayerStats';
+import FullScorecard from '../components/FullScorecard';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
@@ -159,9 +161,26 @@ export default function Watch() {
                      )}
                   </div>
                )}
+
+               {!isMatchComplete && (
+                  <LivePlayerStats 
+                      balls={balls} 
+                      activeInningsNum={activeInningsScore?.innings} 
+                  />
+               )}
             </div>
         ) : <div className="text-center text-gray-500 py-10 uppercase tracking-widest">Match starting soon...</div>}
       </div>
+
+      {isMatchComplete && (
+         <FullScorecard 
+             fixture={fixture} 
+             balls={balls} 
+             scores={scores} 
+             teamA={teamA} 
+             teamB={teamB} 
+         />
+      )}
 
       <div className="bg-cricket-card p-6 rounded-xl border border-gray-800 shadow-xl">
          <h3 className="text-sm text-gray-400 font-bold uppercase tracking-widest mb-4 border-b border-gray-800 pb-2">Ball by Ball Timeline</h3>
