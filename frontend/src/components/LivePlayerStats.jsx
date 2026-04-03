@@ -34,11 +34,16 @@ export default function LivePlayerStats({ balls, activeInningsNum, currentStrike
              wickets: bBalls.filter(b => b.is_wicket && b.wicket_type !== 'run_out').length
          };
      }
-     
      return { striker: sStats, bowler: bStats };
   }, [balls, activeInningsNum, currentStriker, currentBowler]);
 
-  if (!stats.striker && !stats.bowler) return null;
+  if (!stats.striker && !stats.bowler) {
+      return (
+         <div className="w-full bg-black/60 border border-gray-800 rounded-lg p-3 mt-4 text-xs font-bold text-center text-gray-600 uppercase tracking-widest">
+            Awaiting Next Delivery...
+         </div>
+      );
+  }
 
   return (
     <div className="w-full bg-black/60 border border-gray-800 rounded-lg p-3 mt-4 text-xs font-bold font-mono tracking-widest divide-y divide-gray-800">

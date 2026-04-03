@@ -165,7 +165,20 @@ export default function Scoring() {
             showToast("💥 WICKET!!");
             setCurrentStriker(''); // Force select new batsman
         }
-        else if (result.updatedScore.is_completed) showToast("🏁 INNINGS COMPLETED!");
+        else if (result.updatedScore.is_completed) {
+            showToast("🏁 INNINGS COMPLETED!");
+            // Check if it was technically the end of the entire match!
+            if (result.updatedScore.innings === 2) {
+                 speakAction("Match Completed! Checking results...");
+                 // Wait a short moment to allow UI to visually flip and math to sync
+                 setTimeout(() => {
+                    const latestMatchStr = document.getElementById("match-result-string")?.innerText || "";
+                    if (latestMatchStr) speakAction(`Match over. ${latestMatchStr.replace('🏆','')}`);
+                 }, 1500);
+            } else {
+                 speakAction("First Innings Completed! Target set.");
+            }
+        }
         else if (result.updatedScore.balls_bowled > 0 && result.updatedScore.balls_bowled % 6 === 0) {
             showToast("🏏 OVER COMPLETED!");
             setCurrentBowler(''); // Force change bowler
@@ -278,7 +291,7 @@ export default function Scoring() {
            <h2 className="text-3xl font-black text-yellow-500 uppercase tracking-widest mb-4 flex items-center justify-center gap-3">
              <Trophy className="w-10 h-10 drop-shadow-md" /> Summary
            </h2>
-           <p className="text-xl font-bold text-white uppercase mb-8 bg-black/60 p-5 rounded-xl border border-gray-700 shadow-inner tracking-widest flex flex-col items-center justify-center">
+           <p id="match-result-string" className="text-xl font-bold text-white uppercase mb-8 bg-black/60 p-5 rounded-xl border border-gray-700 shadow-inner tracking-widest flex flex-col items-center justify-center">
              {getMatchResult()}
              {fixture.match_type === 'Final' && (
                 <span className="mt-4 text-sm bg-yellow-900 border border-yellow-500 text-yellow-400 px-4 py-2 rounded-lg animate-pulse flex items-center justify-center font-black">

@@ -17,25 +17,48 @@ export default function Fixtures({ isAdminMode = false }) {
     if (!activeTournamentId) return;
     try {
       const res = await fetch(`${API_BASE}/tournament/fixtures?tournament_id=${activeTournamentId}`);
-      if (!res.ok) throw new Error("Failed to load Fixtures API.");
-      const data = await res.json();
+      let data = await res.json();
       
-      // Explicit Fixture Ordering: Live First, then Upcoming, then Completed!
-      const priority = { 'live': 1, 'toss': 2, 'upcoming': 3, 'completed': 4, 'super_over': 1 };
-      data.sort((a,b) => (priority[a.status] || 5) - (priority[b.status] || 5));
-      
+      // Compute League Match Numbers globally before prioritizing Live matches
+      let leagueCounter = 1;
+      data.forEach(f => {
+          if (f.match_type === 'league' || f.match_type === 'League') {
+              f.match_number = leagueCounter++;
+          }
+      });
+
+      data.sort((a,b) => {
+         if (a.status === 'live' && b.status !== 'live') return -1;
+         if (b.status === 'live' && a.status !== 'live') return 1;
+         if (a.status === 'upcoming' && b.status !== 'upcoming') return -1;
+         if (b.status === 'upcoming' && a.status !== 'upcoming') return 1;
+         return 0;
+      });
       setFixtures(data);
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     if (!activeTournamentId) {
-       navigate('/');
-    } else {
-       fetchFixtures();
+      navigate('/');
+      return;
     }
+    fetchFixtures();
+
+    const fixtureSub = supabase.channel('fixtures-list-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fixtures', filter: `tournament_id=eq.${activeTournamentId}` }, () => {
+         fetchFixtures();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'match_scores' }, () => {
+         fetchFixtures(); // Also trigger on scored innings causing statuses
+      })
+      .subscribe();
+      
+    return () => supabase.removeChannel(fixtureSub);
   }, [activeTournamentId, navigate]);
 
   const handleGenerateLeague = async () => {
@@ -178,6 +201,12 @@ export default function Fixtures({ isAdminMode = false }) {
                     <h3 className="text-xl font-extrabold text-white uppercase">{f.team_b?.team_name || 'TBD'}</h3>
                  </div>
               </div>
+              <p className="text-gray-400 font-bold uppercase tracking-widest text-xs flex justify-between w-full">
+                 <span>{f.match_type === 'league' || f.match_type === 'League' ? `Match ${f.match_number || '?'}` : f.match_type} • {f.total_overs} Overs</span>
+                 <span className={`px-2 py-1 rounded text-[10px] ${f.status === 'live' ? 'bg-red-600 text-white animate-pulse' : f.status === 'completed' ? 'bg-gray-700' : 'bg-blue-600'}`}>
+                    {f.status}
+                 </span>
+              </p>
             </div>
             
             <div className="p-4 bg-black/30 border-t border-gray-800 flex flex-col gap-2">
