@@ -27,12 +27,10 @@ export default function Scoring() {
   const [error, setError] = useState(null);
   const showError = (msg) => { setError(msg); setTimeout(() => setError(null), 4000); };
 
-  const speakDotBall = () => {
-    const phrases = ["Chocolate coffee!", "Gowdru kabab!", "VCC kabab!", "Reddy biryani!", "Reddy porota!", "Attibele Anarkali!", "Ramakrishna paniyaram!"];
-    const text = phrases[Math.floor(Math.random() * phrases.length)];
+  const speakAction = (text) => {
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.pitch = 1.2;
+      utterance.pitch = 1.1;
       utterance.rate = 1.1;
       window.speechSynthesis.speak(utterance);
     }
@@ -101,8 +99,25 @@ export default function Scoring() {
     payload.striker_name = currentStriker;
     payload.bowler_name = currentBowler;
 
-    if (payload.runs_scored === 0 && !payload.is_wide && !payload.is_no_ball && !payload.is_wicket) {
-        speakDotBall();
+    if (payload.is_wicket) {
+        speakAction("Out! What a Wicket!");
+    } else if (payload.is_wide) {
+        speakAction("Wide Ball!");
+    } else if (payload.is_no_ball) {
+        speakAction("No Ball! Free Hit!");
+    } else if (payload.runs_scored === 0) {
+        const phrases = ["Chocolate coffee!", "Gowdru kabab!", "VCC kabab!", "Reddy biryani!", "Reddy porota!", "Attibele Anarkali!", "Ramakrishna paniyaram!", "Meghana's Kushka!"];
+        speakAction(phrases[Math.floor(Math.random() * phrases.length)]);
+    } else if (payload.runs_scored === 1) {
+        speakAction("Single Taken");
+    } else if (payload.runs_scored === 2) {
+        speakAction("Two runs!");
+    } else if (payload.runs_scored === 3) {
+        speakAction("Three runs! Great running!");
+    } else if (payload.runs_scored === 4) {
+        speakAction("Four runs! Superb Boundary!");
+    } else if (payload.runs_scored === 6) {
+        speakAction("Six runs! Absolute Maximum!");
     }
 
     // --- SUPER-FAST OPTIMISTIC UI UPDATE ---

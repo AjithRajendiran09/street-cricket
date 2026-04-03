@@ -125,11 +125,20 @@ class MatchService {
             if (firstInnings) target = firstInnings.runs + 1;
         }
 
+        // Determine structural max wickets for innings completion directly by analyzing exact team count
+        const { data: activeTeam } = await supabase.from('teams').select('*').eq('id', currentInningsScore.team_id).single();
+        let maxWickets = 0;
+        if (activeTeam.player1_name) maxWickets += 1;
+        if (activeTeam.player2_name) maxWickets += 1;
+        if (activeTeam.player3_name) maxWickets += 1;
+        // Last Man Standing means inning terminates identically when ALL players are explicitly out.
+
         // Build state for scoring engine
         const state = {
             ...currentInningsScore,
             total_overs: fixture.total_overs,
-            target
+            target,
+            max_wickets: maxWickets
         };
 
         const { updatedScore, ballRecord } = ScoringEngine.processBall(state, eventPayload);

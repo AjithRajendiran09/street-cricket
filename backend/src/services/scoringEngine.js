@@ -16,8 +16,10 @@ class ScoringEngine {
         let newBallsBowled = balls_bowled;
         let newExtras = extras;
         
-        // Validation: cannot score if match/innings completed or wickets >= 3
-        if (state.is_completed || wickets >= 3 || balls_bowled >= total_overs * 6) {
+        const maxWicketsAllowed = state.max_wickets || 3;
+
+        // Validation: cannot score if match/innings completed or wickets >= available players
+        if (state.is_completed || wickets >= maxWicketsAllowed || balls_bowled >= total_overs * 6) {
             throw new Error("Cannot add ball. Innings already completed.");
         }
 
@@ -50,11 +52,8 @@ class ScoringEngine {
             newBallsBowled += 1;
         }
 
-        // Check if innings completed
-        let isCompleted = false;
-        
-        // 3 wickets -> innings ends. Street cricket rules explicitly requested 3 players batting
-        if (newWickets >= 3 || newBallsBowled >= total_overs * 6) {
+        // Dynamic Termination -> ends instantly precisely when the exact number of physical team players are exhausted natively!
+        if (newWickets >= maxWicketsAllowed || newBallsBowled >= total_overs * 6) {
             isCompleted = true;
         }
 

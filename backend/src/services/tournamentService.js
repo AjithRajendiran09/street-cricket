@@ -135,7 +135,7 @@ class TournamentService {
         const table = await this.getPointsTable(tournament_id);
         const numTeams = table.length;
 
-        if (numTeams < 4) throw new Error("At least 4 teams required for playoffs");
+        if (numTeams < 2) throw new Error("At least 2 teams required for playoffs");
 
         // Verify playoffs haven't already been created
         const { data: check } = await supabase.from('fixtures').select('id').eq('tournament_id', tournament_id).in('match_type', ['SF1', 'SF2', 'Semifinal', 'Final']);
