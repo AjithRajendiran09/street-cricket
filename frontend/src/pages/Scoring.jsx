@@ -165,22 +165,27 @@ export default function Scoring() {
             showToast("💥 WICKET!!");
             setCurrentStriker(''); // Force select new batsman
         }
-        else if (result.updatedScore.is_completed) {
-            showToast("🏁 INNINGS COMPLETED!");
-            // Check if it was technically the end of the entire match!
+
+        if (result.updatedScore.is_completed) {
+            setTimeout(() => showToast("🏁 INNINGS COMPLETED!"), payload.is_wicket ? 1500 : 0);
+            
             if (result.updatedScore.innings === 2) {
-                 speakAction("Match Completed! Checking results...");
-                 // Wait a short moment to allow UI to visually flip and math to sync
-                 setTimeout(() => {
-                    const latestMatchStr = document.getElementById("match-result-string")?.innerText || "";
-                    if (latestMatchStr) speakAction(`Match over. ${latestMatchStr.replace('🏆','')}`);
-                 }, 1500);
+                 const inn1runs = scores[1]?.runs || 0;
+                 const inn2runs = result.updatedScore.runs;
+                 const t1 = teamA?.id === scores[1]?.team_id ? teamA?.team_name : teamB?.team_name;
+                 const t2 = teamA?.id === result.updatedScore.team_id ? teamA?.team_name : teamB?.team_name;
+                 
+                 let finalString = "Match tied.";
+                 if (inn1runs > inn2runs) finalString = `${t1} won by ${inn1runs - inn2runs} runs.`;
+                 else if (inn2runs > inn1runs) finalString = `${t2} won the match.`;
+
+                 speakAction(`Match Completed! ${finalString}`);
             } else {
                  speakAction("First Innings Completed! Target set.");
             }
         }
         else if (result.updatedScore.balls_bowled > 0 && result.updatedScore.balls_bowled % 6 === 0) {
-            showToast("🏏 OVER COMPLETED!");
+            setTimeout(() => showToast("🏏 OVER COMPLETED!"), payload.is_wicket ? 1500 : 0);
             setCurrentBowler(''); // Force change bowler
         }
         
