@@ -52,6 +52,7 @@ class ScoringEngine {
             newBallsBowled += 1;
         }
 
+        let isCompleted = false;
         // Dynamic Termination -> ends instantly precisely when the exact number of physical team players are exhausted natively!
         if (newWickets >= maxWicketsAllowed || newBallsBowled >= total_overs * 6) {
             isCompleted = true;
