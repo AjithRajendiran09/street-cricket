@@ -399,7 +399,7 @@ export default function Scoring() {
                 </div>
                 <div className="flex items-center gap-2">
                    <span className="text-cricket-accent text-xl">⚾</span>
-                   <select disabled={isMatchComplete} value={currentBowler} onChange={(e) => setCurrentBowler(e.target.value)} className={`bg-black border ${currentBowler ? 'border-gray-700' : 'border-red-500 ring-1 ring-red-500'} text-white rounded p-2 flex-1 focus:outline-none focus:border-cricket-accent appearance-none`}>
+                   <select disabled={isMatchComplete || (activeInningsScore && activeInningsScore.balls_bowled > 0 && activeInningsScore.balls_bowled % 6 !== 0)} value={currentBowler} onChange={(e) => setCurrentBowler(e.target.value)} className={`bg-black border ${currentBowler ? 'border-gray-700' : 'border-red-500 ring-1 ring-red-500'} text-white rounded p-2 flex-1 focus:outline-none focus:border-cricket-accent appearance-none disabled:opacity-50`}>
                       <option value="" disabled>Select Bowler</option>
                       {bowlingPlayers.map(p => <option key={p} value={p}>{p}</option>)}
                    </select>
