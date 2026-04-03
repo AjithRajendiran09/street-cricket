@@ -29,10 +29,12 @@ export default function Scoring() {
 
   const speakAction = (text) => {
     if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.pitch = 1.1;
-      utterance.rate = 1.1;
-      window.speechSynthesis.speak(utterance);
+      setTimeout(() => {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.pitch = 1.1;
+        utterance.rate = 1.1;
+        window.speechSynthesis.speak(utterance);
+      }, 10);
     }
   };
 
