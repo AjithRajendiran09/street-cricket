@@ -104,25 +104,31 @@ export default function Scoring() {
     payload.striker_name = currentStriker;
     payload.bowler_name = currentBowler;
 
+    let prefixSpeech = "";
+    const activeForSpeech = scores[2] && !scores[2].is_completed ? scores[2] : (scores[1] && !scores[1].is_completed ? scores[1] : (scores[2] || scores[1]));
+    if (activeForSpeech && activeForSpeech.balls_bowled % 6 === 0) {
+        prefixSpeech = `${currentBowler} to ${currentStriker}. `;
+    }
+
     if (payload.is_wicket) {
-      speakAction("Out! What a Wicket!oost");
+      speakAction(prefixSpeech + "Out! What a Wicket!");
     } else if (payload.is_wide) {
-      speakAction("Wide Ball!");
+      speakAction(prefixSpeech + "Wide Ball!");
     } else if (payload.is_no_ball) {
-      speakAction("No Ball! Free Hit!");
+      speakAction(prefixSpeech + "No Ball! Free Hit!");
     } else if (payload.runs_scored === 0) {
       const phrases = ["Chocolate coffee!", "Gowdru kabab!", "VCC kabab!", "Reddy biryani!", "Reddy porota!", "Attibele Anarkali!", "Ramakrishna paniyaram!", "Meghana's Kushka!"];
-      speakAction(phrases[Math.floor(Math.random() * phrases.length)]);
+      speakAction(prefixSpeech + phrases[Math.floor(Math.random() * phrases.length)]);
     } else if (payload.runs_scored === 1) {
-      speakAction("Single Taken");
+      speakAction(prefixSpeech + "Single Taken");
     } else if (payload.runs_scored === 2) {
-      speakAction("Two runs!");
+      speakAction(prefixSpeech + "Two runs!");
     } else if (payload.runs_scored === 3) {
-      speakAction("Three runs! Great running!");
+      speakAction(prefixSpeech + "Three runs! Great running!");
     } else if (payload.runs_scored === 4) {
-      speakAction("Four runs! Superb Boundary!");
+      speakAction(prefixSpeech + "Four runs! Superb Boundary!");
     } else if (payload.runs_scored === 6) {
-      speakAction("Six runs! Absolute Maximum!");
+      speakAction(prefixSpeech + "Six runs! Absolute Maximum!");
     }
 
     // --- SUPER-FAST OPTIMISTIC UI UPDATE ---
