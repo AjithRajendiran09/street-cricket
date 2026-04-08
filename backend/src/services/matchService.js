@@ -267,7 +267,8 @@ class MatchService {
         // Fetch fixture
         const { data: fixture } = await supabase.from('fixtures').select('*').eq('id', fixtureId).single();
         if (fixture.status === 'completed') {
-            throw new Error("Cannot undo after match is completed.");
+            // Unlock Match and set back to LIVE implicitly!
+            await supabase.from('fixtures').update({ status: 'live', match_end_time: null }).eq('id', fixtureId);
         }
 
         // Get the latest ball

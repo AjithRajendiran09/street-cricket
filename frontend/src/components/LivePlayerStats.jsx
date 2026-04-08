@@ -14,12 +14,13 @@ export default function LivePlayerStats({ balls, activeInningsNum, currentStrike
      let sStats = null;
      if (striker) {
          const sBalls = innBalls.filter(b => b.striker_name === striker);
+         const legalBalls = sBalls.filter(b => !b.is_wide);
          sStats = {
              name: striker,
-             runs: sBalls.reduce((a, b) => a + (b.runs_scored || 0), 0),
-             balls: sBalls.filter(b => !b.is_wide).length,
-             fours: sBalls.filter(b => b.runs_scored === 4).length,
-             sixes: sBalls.filter(b => b.runs_scored === 6).length
+             runs: legalBalls.reduce((a, b) => a + (b.runs_scored || 0), 0),
+             balls: legalBalls.length,
+             fours: legalBalls.filter(b => b.runs_scored === 4).length,
+             sixes: legalBalls.filter(b => b.runs_scored === 6).length
          };
      }
 

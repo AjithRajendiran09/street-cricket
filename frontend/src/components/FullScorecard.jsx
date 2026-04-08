@@ -23,10 +23,12 @@ export default function FullScorecard({ fixture, balls, scores, teamA, teamB }) 
          if (b.striker_name) {
              if (!batters[b.striker_name]) batters[b.striker_name] = { name: b.striker_name, runs: 0, balls: 0, fours: 0, sixes: 0, status: 'Not Out' };
              const st = batters[b.striker_name];
-             if (!b.is_wide) st.balls += 1;
-             st.runs += (b.runs_scored || 0);
-             if (b.runs_scored === 4) st.fours += 1;
-             if (b.runs_scored === 6) st.sixes += 1;
+             if (!b.is_wide) {
+                 st.balls += 1;
+                 st.runs += (b.runs_scored || 0);
+                 if (b.runs_scored === 4) st.fours += 1;
+                 if (b.runs_scored === 6) st.sixes += 1;
+             }
              if (b.is_wicket) st.status = `b ${b.bowler_name || 'Unknown'}`;
          }
          if (b.bowler_name) {

@@ -139,7 +139,7 @@ export default function Fixtures({ isAdminMode = false }) {
       case 'live':
         return <Link to={`/admin/scoring/${f.id}`} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-bold animate-pulse w-full mb-2 text-center uppercase">Score Live</Link>;
       case 'completed':
-        return <span className="bg-gray-800 text-gray-400 px-4 py-2 rounded text-sm font-bold w-full mb-2 text-center uppercase select-none">Completed</span>;
+        return <Link to={`/admin/scoring/${f.id}`} className="bg-yellow-700 hover:bg-yellow-600 text-white px-4 py-2 rounded text-sm font-bold w-full mb-2 text-center uppercase">Modify Match</Link>;
       default:
         return null;
     }

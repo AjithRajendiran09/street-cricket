@@ -192,10 +192,12 @@ router.get('/leaderboard', async (req, res) => {
             if (b.striker_name) {
                 if (!battingStats[b.striker_name]) battingStats[b.striker_name] = { name: b.striker_name, runs: 0, balls: 0, sixes: 0, fours: 0 };
                 const stat = battingStats[b.striker_name];
-                if (!b.is_wide) stat.balls += 1;
-                stat.runs += b.runs_scored;
-                if (b.runs_scored === 4) stat.fours += 1;
-                if (b.runs_scored === 6) stat.sixes += 1;
+                if (!b.is_wide) {
+                    stat.balls += 1;
+                    stat.runs += (b.runs_scored || 0);
+                    if (b.runs_scored === 4) stat.fours += 1;
+                    if (b.runs_scored === 6) stat.sixes += 1;
+                }
             }
 
             if (b.bowler_name) {
