@@ -18,6 +18,17 @@ export default function Toss() {
   const [error, setError] = useState(null);
   const showError = (msg) => { setError(msg); setTimeout(() => setError(null), 4000); };
 
+  const speakToss = (text) => {
+    if ('speechSynthesis' in window) {
+      setTimeout(() => {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.pitch = 1.1;
+        utterance.rate = 1.1;
+        window.speechSynthesis.speak(utterance);
+      }, 10);
+    }
+  };
+
   useEffect(() => {
     fetch(`${API_BASE}/tournament/fixtures/${fixtureId}`)
       .then(res => res.json())
@@ -37,6 +48,9 @@ export default function Toss() {
 
   const executeCoinFlip = () => {
     setStep('flipping');
+    const callingTeam = fixture.team_a?.team_name || 'Team A';
+    speakToss(`Coin is in the air. ${callingTeam} calls ${calledSide}.`);
+    
     setTimeout(() => {
       // Logic for random toss result
       const isHeads = Math.random() < 0.5;
@@ -65,6 +79,10 @@ export default function Toss() {
       if (res.ok) {
         setTossResult({ winnerId: data.toss_winner_id, decision: data.toss_decision });
         setFixture(data);
+        
+        const winName = data.toss_winner_id === fixture.team_a?.id ? fixture.team_a?.team_name : fixture.team_b?.team_name;
+        speakToss(`${winName} won the toss, and elected to ${decision} first!`);
+        
         setStep('completed');
       } else {
         showError("Error: " + data.error);

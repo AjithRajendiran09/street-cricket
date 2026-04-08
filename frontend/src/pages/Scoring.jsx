@@ -29,14 +29,15 @@ export default function Scoring() {
   const [error, setError] = useState(null);
   const showError = (msg) => { setError(msg); setTimeout(() => setError(null), 4000); };
 
-  const speakAction = (text) => {
+  const speakAction = (text, priority = false) => {
     if ('speechSynthesis' in window) {
+      if (priority) window.speechSynthesis.cancel();
       setTimeout(() => {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.pitch = 1.1;
-        utterance.rate = 1.1;
+        utterance.rate = priority ? 1.0 : 1.1;
         window.speechSynthesis.speak(utterance);
-      }, 10);
+      }, priority ? 50 : 10);
     }
   };
 
@@ -104,7 +105,7 @@ export default function Scoring() {
     payload.bowler_name = currentBowler;
 
     if (payload.is_wicket) {
-      speakAction("Out! What a Wicket!");
+      speakAction("Out! What a Wicket!oost");
     } else if (payload.is_wide) {
       speakAction("Wide Ball!");
     } else if (payload.is_no_ball) {
@@ -170,18 +171,22 @@ export default function Scoring() {
           setTimeout(() => showToast("🏁 INNINGS COMPLETED!"), payload.is_wicket ? 1500 : 0);
 
           if (result.updatedScore.innings === 2) {
-            const inn1runs = scores[1]?.runs || 0;
-            const inn2runs = result.updatedScore.runs;
-            const t1 = teamA?.id === scores[1]?.team_id ? teamA?.team_name : teamB?.team_name;
-            const t2 = teamA?.id === result.updatedScore.team_id ? teamA?.team_name : teamB?.team_name;
+            const inn1 = scores[1];
+            if (inn1) {
+              const inn1runs = inn1.runs;
+              const inn2runs = result.updatedScore.runs;
+              const t1 = teamA?.id === inn1.team_id ? teamA?.team_name : teamB?.team_name;
+              const t2 = teamA?.id === result.updatedScore.team_id ? teamA?.team_name : teamB?.team_name;
 
-            let finalString = "Match tied.";
-            if (inn1runs > inn2runs) finalString = `${t1} won by ${inn1runs - inn2runs} runs.`;
-            else if (inn2runs > inn1runs) finalString = `${t2} won the match.`;
+              let finalString = "Match tied.";
+              if (inn1runs > inn2runs) finalString = `${t1} won by ${inn1runs - inn2runs} runs.`;
+              else if (inn2runs > inn1runs) finalString = `${t2} won the match.`;
 
-            speakAction(`Match Completed! ${finalString}`);
+              // priority=true forcibly overrides iOS Safari queue silencing bugs!
+              speakAction(`Match Completed. ${finalString}`, true);
+            }
           } else {
-            speakAction("First Innings Completed! Target set.");
+            speakAction("First Innings Completed! Target set.", true);
           }
         }
         else if (result.updatedScore.balls_bowled > 0 && result.updatedScore.balls_bowled % 6 === 0) {
