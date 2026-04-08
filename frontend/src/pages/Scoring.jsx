@@ -108,6 +108,9 @@ export default function Scoring() {
     const activeForSpeech = scores[2] && !scores[2].is_completed ? scores[2] : (scores[1] && !scores[1].is_completed ? scores[1] : (scores[2] || scores[1]));
     if (activeForSpeech && activeForSpeech.balls_bowled % 6 === 0) {
         prefixSpeech = `${currentBowler} to ${currentStriker}. `;
+        if (activeForSpeech.innings === 2 && activeForSpeech.balls_bowled === 0 && scores[1]) {
+             prefixSpeech += `Target is ${scores[1].runs + 1}. `;
+        }
     }
 
     if (payload.is_wicket) {
@@ -192,7 +195,8 @@ export default function Scoring() {
               speakAction(`Match Completed. ${finalString}`, true);
             }
           } else {
-            speakAction("First Innings Completed! Target set.", true);
+            const targetRuns = result.updatedScore.runs + 1;
+            speakAction(`First Innings Completed! The target is ${targetRuns} runs.`, true);
           }
         }
         else if (result.updatedScore.balls_bowled > 0 && result.updatedScore.balls_bowled % 6 === 0) {
