@@ -3,7 +3,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { Download } from 'lucide-react';
 
-export default function FullScorecard({ fixture, balls, scores, teamA, teamB }) {
+export default function FullScorecard({ fixture, balls, scores, teamA, teamB, mvpPlayer }) {
   const getTeamName = (id) => id === teamA?.id ? teamA?.team_name : (id === teamB?.id ? teamB?.team_name : 'Unknown');
 
   const scorecards = useMemo(() => {
@@ -105,7 +105,11 @@ export default function FullScorecard({ fixture, balls, scores, teamA, teamB }) 
                     <tbody className="bg-white text-black text-sm">
                        {inn.batting.map(b => (
                           <tr key={b.name} className="border-b border-gray-200">
-                              <td className="p-2 border border-gray-300 font-bold whitespace-nowrap">{b.name} <div className="text-[10px] text-gray-500 font-normal md:hidden">{b.status}</div></td>
+                              <td className="p-2 border border-gray-300 font-bold whitespace-nowrap">
+                                {b.name}
+                                {mvpPlayer === b.name && <span className="text-[9px] bg-yellow-500 text-black px-1 rounded ml-2 animate-pulse shadow-sm relative -top-0.5 whitespace-nowrap">🌟 MVP</span>}
+                                <div className="text-[10px] text-gray-500 font-normal md:hidden">{b.status}</div>
+                              </td>
                               <td className="p-2 border border-gray-300 hidden md:table-cell text-gray-600">{b.status}</td>
                               <td className="p-2 border border-gray-300 text-center font-bold">{b.runs}</td>
                               <td className="p-2 border border-gray-300 text-center">{b.balls}</td>
@@ -138,7 +142,10 @@ export default function FullScorecard({ fixture, balls, scores, teamA, teamB }) 
                           const ov = b.legal / 6;
                           return (
                           <tr key={b.name} className="border-b border-gray-200">
-                              <td className="p-2 border border-gray-300 text-left font-bold">{b.name}</td>
+                              <td className="p-2 border border-gray-300 text-left font-bold">
+                                {b.name}
+                                {mvpPlayer === b.name && <span className="text-[9px] bg-yellow-500 text-black px-1 rounded ml-2 animate-pulse shadow-sm relative -top-0.5 whitespace-nowrap">🌟 MVP</span>}
+                              </td>
                               <td className="p-2 border border-gray-300">{Math.floor(b.legal/6)}.{b.legal%6}</td>
                               <td className="p-2 border border-gray-300">{b.runs}</td>
                               <td className="p-2 border border-gray-300 font-bold text-red-600">{b.wickets}</td>

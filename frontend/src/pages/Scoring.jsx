@@ -107,10 +107,10 @@ export default function Scoring() {
     let prefixSpeech = "";
     const activeForSpeech = scores[2] && !scores[2].is_completed ? scores[2] : (scores[1] && !scores[1].is_completed ? scores[1] : (scores[2] || scores[1]));
     if (activeForSpeech && activeForSpeech.balls_bowled % 6 === 0) {
-        prefixSpeech = `${currentBowler} to ${currentStriker}. `;
-        if (activeForSpeech.innings === 2 && activeForSpeech.balls_bowled === 0 && scores[1]) {
-             prefixSpeech += `Target is ${scores[1].runs + 1}. `;
-        }
+      prefixSpeech = `${currentBowler} to ${currentStriker}. `;
+      if (activeForSpeech.innings === 2 && activeForSpeech.balls_bowled === 0 && scores[1]) {
+        prefixSpeech += `Target is ${scores[1].runs + 1}. `;
+      }
     }
 
     if (payload.is_wicket) {
@@ -275,6 +275,48 @@ export default function Scoring() {
     return null;
   };
 
+  const getMVP = () => {
+      if (!isMatchComplete || !balls || balls.length === 0) return null;
+      const playerPoints = {};
+      
+      balls.forEach(b => {
+          if (b.striker_name && !b.is_wide) {
+              if (!playerPoints[b.striker_name]) playerPoints[b.striker_name] = 0;
+              playerPoints[b.striker_name] += (b.runs_scored || 0); // 1 pt per run
+              if (b.runs_scored === 4) playerPoints[b.striker_name] += 1; // Bonus
+              if (b.runs_scored === 6) playerPoints[b.striker_name] += 2; // Bonus
+          }
+          if (b.bowler_name) {
+              if (!playerPoints[b.bowler_name]) playerPoints[b.bowler_name] = 0;
+              if (b.is_wicket && !['run_out', 'retired_hurt'].includes(b.wicket_type)) {
+                  playerPoints[b.bowler_name] += 15; // 15 pts per wicket
+              }
+              if ((b.runs_scored || 0) === 0 && !b.is_wide && !b.is_no_ball && (b.extras || 0) === 0 && !b.is_wicket) {
+                  playerPoints[b.bowler_name] += 1; // 1 pt per dot ball
+              }
+          }
+      });
+      const mvp = Object.entries(playerPoints).sort((a,b) => b[1] - a[1])[0];
+      return mvp ? mvp[0] : null;
+  };
+
+  const mvpPlayer = getMVP();
+
+  const generateWhatsAppShare = () => {
+      const matchRes = getMatchResult();
+      const mvpStr = mvpPlayer ? `\n🌟 *Player of the Match:* ${mvpPlayer}` : '';
+      const t1Name = getTeamName(scores[1]?.team_id) || 'Team 1';
+      const t2Name = getTeamName(scores[2]?.team_id) || 'Team 2';
+      
+      const s1 = scores[1] ? `🏏 *${t1Name}*: ${scores[1].runs}/${scores[1].wickets} (${formatOvers(scores[1].balls_bowled)} ov)` : '';
+      const s2 = scores[2] ? `🏏 *${t2Name}*: ${scores[2].runs}/${scores[2].wickets} (${formatOvers(scores[2].balls_bowled)} ov)` : '';
+      
+      const text = `🏆 *STREET CRICKET RESULTS* 🏆\n\n${s1}\n${s2}\n\n🔥 *${matchRes?.replace('🏆','') || ''}*${mvpStr}\n\nFollow live leaderboard on the App!`;
+      
+      const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+      window.open(url, '_blank');
+  };
+
   const ScoreBtn = ({ label, action, styleClass = "bg-gray-800 text-white" }) => (
     <button disabled={isMatchComplete} onClick={action} className={`p-4 rounded-xl text-xl font-bold uppercase active:scale-95 transition-transform shadow-lg ${styleClass} ${isMatchComplete && 'opacity-50'}`}>{label}</button>
   );
@@ -340,9 +382,15 @@ export default function Scoring() {
             scores={scores}
             teamA={teamA}
             teamB={teamB}
+            mvpPlayer={mvpPlayer}
           />
 
-          <button onClick={() => navigate('/points')} className="mt-8 w-full bg-cricket-accent hover:bg-yellow-500 text-black font-black uppercase tracking-widest py-4 rounded-xl transition-all shadow-[0_0_15px_rgba(234,179,8,0.3)] hover:scale-105 focus:outline-none">
+          <button onClick={generateWhatsAppShare} className="mt-8 w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-black uppercase tracking-widest py-4 rounded-xl transition-all shadow-[0_0_15px_rgba(37,211,102,0.4)] hover:scale-105 flex items-center justify-center gap-2 focus:outline-none">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+            Share to WhatsApp
+          </button>
+
+          <button onClick={() => navigate('/points')} className="mt-4 w-full bg-cricket-accent hover:bg-yellow-500 text-black font-black uppercase tracking-widest py-4 rounded-xl transition-all shadow-[0_0_15px_rgba(234,179,8,0.3)] hover:scale-105 focus:outline-none">
             View Points Table &gt;
           </button>
 
