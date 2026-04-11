@@ -17,6 +17,7 @@ export default function Scoring() {
   const [balls, setBalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
+  const [shake, setShake] = useState(false);
 
   // Player Tracking
   const [currentStriker, setCurrentStriker] = useState('');
@@ -28,6 +29,56 @@ export default function Scoring() {
   };
   const [error, setError] = useState(null);
   const showError = (msg) => { setError(msg); setTimeout(() => setError(null), 4000); };
+
+  const triggerShake = () => {
+    setShake(true);
+    setTimeout(() => setShake(false), 500);
+  };
+
+  const playAudioSfx = (type) => {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      const now = ctx.currentTime;
+      if (type === 'bat') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+        gain.gain.setValueAtTime(1, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+        osc.start(now);
+        osc.stop(now + 0.1);
+      } else if (type === 'wicket') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.4);
+        gain.gain.setValueAtTime(1, now);
+
+        // Tremolo for shattering sound
+        const lfo = ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = 20;
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.value = 0.5;
+        lfo.connect(lfoGain);
+        lfoGain.connect(gain.gain);
+        lfo.start(now);
+        lfo.stop(now + 0.4);
+
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+        osc.start(now);
+        osc.stop(now + 0.4);
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  };
 
   const speakAction = (text, priority = false) => {
     if ('speechSynthesis' in window) {
@@ -114,7 +165,8 @@ export default function Scoring() {
     }
 
     if (payload.is_wicket) {
-      speakAction(prefixSpeech + "Out! What a Wicket!");
+      playAudioSfx('wicket');
+      speakAction(prefixSpeech + "Out! What a Wicket ooostt!");
     } else if (payload.is_wide) {
       speakAction(prefixSpeech + "Wide Ball!");
     } else if (payload.is_no_ball) {
@@ -129,8 +181,12 @@ export default function Scoring() {
     } else if (payload.runs_scored === 3) {
       speakAction(prefixSpeech + "Three runs! Great running!");
     } else if (payload.runs_scored === 4) {
+      playAudioSfx('bat');
+      triggerShake();
       speakAction(prefixSpeech + "Four runs! Superb Boundary!");
     } else if (payload.runs_scored === 6) {
+      playAudioSfx('bat');
+      triggerShake();
       speakAction(prefixSpeech + "Six runs! Absolute Maximum!");
     }
 
@@ -178,6 +234,8 @@ export default function Scoring() {
 
         if (result.updatedScore.is_completed) {
           setTimeout(() => showToast("🏁 INNINGS COMPLETED!"), payload.is_wicket ? 1500 : 0);
+          setCurrentStriker(''); // Clear for next innings
+          setCurrentBowler(''); // Clear for next innings
 
           if (result.updatedScore.innings === 2) {
             const inn1 = scores[1];
@@ -214,6 +272,34 @@ export default function Scoring() {
   const activeInningsScore = scores[2] && !scores[2].is_completed ? scores[2] : (scores[1] && !scores[1].is_completed ? scores[1] : (scores[2] || scores[1]));
   const activeInningsNum = activeInningsScore ? activeInningsScore.innings : 1;
   const calculatedTarget = activeInningsScore?.innings === 2 && scores[1] ? scores[1].runs + 1 : null;
+
+  const calculateWinProbability = () => {
+    try {
+      if (activeInningsNum !== 2 || !calculatedTarget || isMatchComplete || !activeInningsScore) return null;
+      const runsNeeded = calculatedTarget - (activeInningsScore.runs || 0);
+      const totalBalls = (fixture?.total_overs || 2) * 6;
+      const ballsLeft = totalBalls - (activeInningsScore.balls_bowled || 0);
+
+      if (runsNeeded <= 0) return 100;
+      if (ballsLeft <= 0) return 0;
+
+      const crr = activeInningsScore.balls_bowled > 0 ? (activeInningsScore.runs / activeInningsScore.balls_bowled) * 6 : ((calculatedTarget - 1) / totalBalls) * 6;
+      const rrr = (runsNeeded / ballsLeft) * 6;
+
+      let prob = 50 + (crr - rrr) * 8;
+      prob -= ((activeInningsScore.wickets || 0) * 6);
+      return Math.round(Math.max(5, Math.min(95, prob || 50)));
+    } catch {
+      return 50;
+    }
+  };
+  const battingProb = calculateWinProbability();
+
+  // Clear selections when innings change (e.g., across refreshes or incoming real-time updates)
+  useEffect(() => {
+    setCurrentStriker('');
+    setCurrentBowler('');
+  }, [activeInningsNum]);
 
   const outPlayers = useMemo(() => {
     if (!balls || !activeInningsScore) return [];
@@ -276,45 +362,45 @@ export default function Scoring() {
   };
 
   const getMVP = () => {
-      if (!isMatchComplete || !balls || balls.length === 0) return null;
-      const playerPoints = {};
-      
-      balls.forEach(b => {
-          if (b.striker_name && !b.is_wide) {
-              if (!playerPoints[b.striker_name]) playerPoints[b.striker_name] = 0;
-              playerPoints[b.striker_name] += (b.runs_scored || 0); // 1 pt per run
-              if (b.runs_scored === 4) playerPoints[b.striker_name] += 1; // Bonus
-              if (b.runs_scored === 6) playerPoints[b.striker_name] += 2; // Bonus
-          }
-          if (b.bowler_name) {
-              if (!playerPoints[b.bowler_name]) playerPoints[b.bowler_name] = 0;
-              if (b.is_wicket && !['run_out', 'retired_hurt'].includes(b.wicket_type)) {
-                  playerPoints[b.bowler_name] += 15; // 15 pts per wicket
-              }
-              if ((b.runs_scored || 0) === 0 && !b.is_wide && !b.is_no_ball && (b.extras || 0) === 0 && !b.is_wicket) {
-                  playerPoints[b.bowler_name] += 1; // 1 pt per dot ball
-              }
-          }
-      });
-      const mvp = Object.entries(playerPoints).sort((a,b) => b[1] - a[1])[0];
-      return mvp ? mvp[0] : null;
+    if (!isMatchComplete || !balls || balls.length === 0) return null;
+    const playerPoints = {};
+
+    balls.forEach(b => {
+      if (b.striker_name && !b.is_wide) {
+        if (!playerPoints[b.striker_name]) playerPoints[b.striker_name] = 0;
+        playerPoints[b.striker_name] += (b.runs_scored || 0); // 1 pt per run
+        if (b.runs_scored === 4) playerPoints[b.striker_name] += 1; // Bonus
+        if (b.runs_scored === 6) playerPoints[b.striker_name] += 2; // Bonus
+      }
+      if (b.bowler_name) {
+        if (!playerPoints[b.bowler_name]) playerPoints[b.bowler_name] = 0;
+        if (b.is_wicket && !['run_out', 'retired_hurt'].includes(b.wicket_type)) {
+          playerPoints[b.bowler_name] += 15; // 15 pts per wicket
+        }
+        if ((b.runs_scored || 0) === 0 && !b.is_wide && !b.is_no_ball && (b.extras || 0) === 0 && !b.is_wicket) {
+          playerPoints[b.bowler_name] += 1; // 1 pt per dot ball
+        }
+      }
+    });
+    const mvp = Object.entries(playerPoints).sort((a, b) => b[1] - a[1])[0];
+    return mvp ? mvp[0] : null;
   };
 
   const mvpPlayer = getMVP();
 
   const generateWhatsAppShare = () => {
-      const matchRes = getMatchResult();
-      const mvpStr = mvpPlayer ? `\n🌟 *Player of the Match:* ${mvpPlayer}` : '';
-      const t1Name = getTeamName(scores[1]?.team_id) || 'Team 1';
-      const t2Name = getTeamName(scores[2]?.team_id) || 'Team 2';
-      
-      const s1 = scores[1] ? `🏏 *${t1Name}*: ${scores[1].runs}/${scores[1].wickets} (${formatOvers(scores[1].balls_bowled)} ov)` : '';
-      const s2 = scores[2] ? `🏏 *${t2Name}*: ${scores[2].runs}/${scores[2].wickets} (${formatOvers(scores[2].balls_bowled)} ov)` : '';
-      
-      const text = `🏆 *STREET CRICKET RESULTS* 🏆\n\n${s1}\n${s2}\n\n🔥 *${matchRes?.replace('🏆','') || ''}*${mvpStr}\n\nFollow live leaderboard on the App!`;
-      
-      const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
-      window.open(url, '_blank');
+    const matchRes = getMatchResult();
+    const mvpStr = mvpPlayer ? `\n🌟 *Player of the Match:* ${mvpPlayer}` : '';
+    const t1Name = getTeamName(scores[1]?.team_id) || 'Team 1';
+    const t2Name = getTeamName(scores[2]?.team_id) || 'Team 2';
+
+    const s1 = scores[1] ? `🏏 *${t1Name}*: ${scores[1].runs}/${scores[1].wickets} (${formatOvers(scores[1].balls_bowled)} ov)` : '';
+    const s2 = scores[2] ? `🏏 *${t2Name}*: ${scores[2].runs}/${scores[2].wickets} (${formatOvers(scores[2].balls_bowled)} ov)` : '';
+
+    const text = `🏆 *STREET CRICKET RESULTS* 🏆\n\n${s1}\n${s2}\n\n🔥 *${matchRes?.replace('🏆', '') || ''}*${mvpStr}\n\nFollow live leaderboard on the App!`;
+
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
   };
 
   const ScoreBtn = ({ label, action, styleClass = "bg-gray-800 text-white" }) => (
@@ -322,7 +408,7 @@ export default function Scoring() {
   );
 
   return (
-    <div className="max-w-md mx-auto relative pb-20">
+    <div className={`max-w-md mx-auto relative pb-20 ${shake ? 'animate-shake' : ''}`}>
       {error && <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-red-600 text-white font-bold px-6 py-3 rounded-lg shadow-2xl z-50 animate-fade-in text-center border border-red-800 tracking-wider flex items-center justify-center gap-2 w-[90%] max-w-sm"><span>⚠️</span> {error}</div>}
       {toast && (
         <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-black font-black text-xl px-6 py-3 rounded-full shadow-2xl z-50 animate-bounce transition">
@@ -386,7 +472,7 @@ export default function Scoring() {
           />
 
           <button onClick={generateWhatsAppShare} className="mt-8 w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-black uppercase tracking-widest py-4 rounded-xl transition-all shadow-[0_0_15px_rgba(37,211,102,0.4)] hover:scale-105 flex items-center justify-center gap-2 focus:outline-none">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" /></svg>
             Share to WhatsApp
           </button>
 
@@ -445,6 +531,22 @@ export default function Scoring() {
                     </div>
                   );
                 })()}
+
+                {battingProb !== null && (
+                  <div className="w-full mt-4 px-2">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-1">
+                      <span className="text-gray-400 truncate flex-1">{getTeamName(scores[1].team_id)} <span className="text-white">{100 - battingProb}%</span></span>
+                      <span className="text-yellow-400 truncate flex-1 text-right"><span className="text-white">{battingProb}%</span> {getTeamName(scores[2].team_id)}</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden flex shadow-inner">
+                      <div className="h-full bg-gray-600 transition-all duration-1000 ease-out border-r border-gray-900" style={{ width: `${100 - battingProb}%` }}></div>
+                      <div className="h-full bg-yellow-500 transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(234,179,8,1)] relative" style={{ width: `${battingProb}%` }}>
+                        <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                      </div>
+                    </div>
+                    <div className="text-[8px] text-center text-gray-600 uppercase tracking-widest mt-1">Live Win Predictor</div>
+                  </div>
+                )}
 
                 <LivePlayerStats
                   balls={balls}

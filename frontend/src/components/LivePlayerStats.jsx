@@ -15,12 +15,16 @@ export default function LivePlayerStats({ balls, activeInningsNum, currentStrike
      if (striker) {
          const sBalls = innBalls.filter(b => b.striker_name === striker);
          const legalBalls = sBalls.filter(b => !b.is_wide);
+         const recentSRuns = innBalls.slice(0, 3).filter(b => b.striker_name === striker).reduce((a,b) => a + (b.runs_scored || 0), 0);
+         const isOnFire = recentSRuns >= 10;
+
          sStats = {
              name: striker,
              runs: legalBalls.reduce((a, b) => a + (b.runs_scored || 0), 0),
              balls: legalBalls.length,
              fours: legalBalls.filter(b => b.runs_scored === 4).length,
-             sixes: legalBalls.filter(b => b.runs_scored === 6).length
+             sixes: legalBalls.filter(b => b.runs_scored === 6).length,
+             isOnFire
          };
      }
 
@@ -28,11 +32,15 @@ export default function LivePlayerStats({ balls, activeInningsNum, currentStrike
      if (bowler) {
          const bBalls = innBalls.filter(b => b.bowler_name === bowler);
          const legal = bBalls.filter(b => !b.is_wide && !b.is_no_ball).length;
+         const recentBWickets = innBalls.slice(0, 6).filter(b => b.bowler_name === bowler && b.is_wicket && b.wicket_type !== 'run_out').length;
+         const isOnFire = recentBWickets >= 2;
+
          bStats = {
              name: bowler,
              overs: `${Math.floor(legal/6)}.${legal%6}`,
              runs: bBalls.reduce((a, b) => a + (b.runs_scored || 0) + (b.extras || 0), 0),
-             wickets: bBalls.filter(b => b.is_wicket && b.wicket_type !== 'run_out').length
+             wickets: bBalls.filter(b => b.is_wicket && b.wicket_type !== 'run_out').length,
+             isOnFire
          };
      }
      return { striker: sStats, bowler: bStats };
@@ -50,7 +58,9 @@ export default function LivePlayerStats({ balls, activeInningsNum, currentStrike
     <div className="w-full bg-black/60 border border-gray-800 rounded-lg p-3 mt-4 text-xs font-bold font-mono tracking-widest divide-y divide-gray-800">
        {stats.striker && (
            <div className="flex justify-between items-center py-2 text-gray-300">
-              <span className="text-white truncate max-w-[40%] flex items-center gap-1">🏏 {stats.striker.name}</span>
+              <span className="text-white truncate max-w-[40%] flex items-center gap-1">
+                🏏 {stats.striker.name} {stats.striker.isOnFire && <span className="animate-pulse drop-shadow-[0_0_10px_red]" title="On Fire!">🔥</span>}
+              </span>
               <span className="text-white font-black">{stats.striker.runs} <span className="text-gray-500 font-normal">({stats.striker.balls})</span></span>
               <span className="text-gray-500 hidden sm:inline">4s: <span className="text-blue-400">{stats.striker.fours}</span></span>
               <span className="text-gray-500 hidden sm:inline">6s: <span className="text-green-400">{stats.striker.sixes}</span></span>
@@ -58,7 +68,9 @@ export default function LivePlayerStats({ balls, activeInningsNum, currentStrike
        )}
        {stats.bowler && (
            <div className="flex justify-between items-center py-2 text-gray-400">
-              <span className="truncate max-w-[40%] flex items-center gap-1 text-cricket-accent">⚾ {stats.bowler.name}</span>
+              <span className="truncate max-w-[40%] flex items-center gap-1 text-cricket-accent">
+                ⚾ {stats.bowler.name} {stats.bowler.isOnFire && <span className="animate-pulse drop-shadow-[0_0_10px_red]" title="On Fire!">🔥</span>}
+              </span>
               <span><span className="hidden sm:inline">O: </span><span className="text-white">{stats.bowler.overs}</span></span>
               <span><span className="hidden sm:inline">R: </span><span className="text-white">{stats.bowler.runs}</span></span>
               <span><span className="hidden sm:inline">W: </span><span className="text-red-400">{stats.bowler.wickets}</span></span>

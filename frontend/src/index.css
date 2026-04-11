@@ -7,3 +7,15 @@
     @apply bg-cricket-dark text-gray-100 font-sans antialiased;
   }
 }
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px) rotate(-1deg); }
+  40% { transform: translateX(6px) rotate(1deg); }
+  60% { transform: translateX(-6px) rotate(-1deg); }
+  80% { transform: translateX(6px) rotate(1deg); }
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
+}
