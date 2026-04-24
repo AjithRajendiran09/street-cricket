@@ -23,6 +23,9 @@ export default function Scoring() {
   const [currentStriker, setCurrentStriker] = useState('');
   const [currentBowler, setCurrentBowler] = useState('');
 
+  // Extras + Runs modal (for WD+runs, NB+runs)
+  const [extrasModal, setExtrasModal] = useState(null); // null | 'wide' | 'noball'
+
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
@@ -300,6 +303,40 @@ export default function Scoring() {
     setCurrentStriker('');
     setCurrentBowler('');
   }, [activeInningsNum]);
+
+  // Restore striker/bowler from last ball when page loads or data refreshes
+  // This fixes the bug where navigating away mid-over and coming back
+  // leaves the bowler empty with the dropdown disabled (can't re-select)
+  useEffect(() => {
+    if (!activeInningsScore || !balls || balls.length === 0) return;
+
+    const inningsBalls = balls
+      .filter(b => b.innings === activeInningsScore.innings)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    if (inningsBalls.length === 0) return;
+
+    const lastBall = inningsBalls[0];
+
+    // Only auto-restore if the current selection is empty (e.g. after navigation)
+    if (!currentBowler && lastBall.bowler_name) {
+      // Mid-over: restore the bowler since the dropdown would be disabled
+      const isMidOver = activeInningsScore.balls_bowled > 0 && activeInningsScore.balls_bowled % 6 !== 0;
+      if (isMidOver) {
+        setCurrentBowler(lastBall.bowler_name);
+      }
+    }
+
+    if (!currentStriker && lastBall.striker_name) {
+      // Restore striker only if they are not out
+      const outPlayerNames = inningsBalls
+        .filter(b => b.is_wicket && b.striker_name)
+        .map(b => b.striker_name);
+      if (!outPlayerNames.includes(lastBall.striker_name)) {
+        setCurrentStriker(lastBall.striker_name);
+      }
+    }
+  }, [balls, activeInningsScore]);
 
   const outPlayers = useMemo(() => {
     if (!balls || !activeInningsScore) return [];
@@ -587,10 +624,46 @@ export default function Scoring() {
             {[0, 1, 2, 3, 4, 6].map(runs => (
               <ScoreBtn key={runs} label={`${runs}`} action={() => addBall({ runs_scored: runs })} styleClass={runs === 4 || runs === 6 ? "bg-blue-600 hover:bg-blue-500" : "bg-gray-800 hover:bg-gray-700"} />
             ))}
-            <ScoreBtn label="WD" action={() => addBall({ is_wide: true, runs_scored: 0 })} styleClass="bg-orange-600 hover:bg-orange-500" />
-            <ScoreBtn label="NB" action={() => addBall({ is_no_ball: true, runs_scored: 0 })} styleClass="bg-purple-600 hover:bg-purple-500" />
+            <ScoreBtn label="WD" action={() => setExtrasModal('wide')} styleClass="bg-orange-600 hover:bg-orange-500" />
+            <ScoreBtn label="NB" action={() => setExtrasModal('noball')} styleClass="bg-purple-600 hover:bg-purple-500" />
             <ScoreBtn label="WK" action={() => addBall({ is_wicket: true, runs_scored: 0 })} styleClass="bg-red-600 hover:bg-red-500 animate-pulse text-white font-black" />
           </div>
+
+          {/* Extras + Runs Modal */}
+          {extrasModal && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={() => setExtrasModal(null)}>
+              <div className="bg-gray-900 border border-gray-700 rounded-2xl p-5 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+                <h3 className={`text-center text-xl font-black uppercase tracking-widest mb-1 ${extrasModal === 'wide' ? 'text-orange-400' : 'text-purple-400'}`}>
+                  {extrasModal === 'wide' ? '⚾ Wide Ball' : '⚾ No Ball'}
+                </h3>
+                <p className="text-center text-gray-500 text-xs uppercase tracking-wider mb-4">How many runs scored?</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[0, 1, 2, 3, 4, 6].map(runs => (
+                    <button
+                      key={runs}
+                      onClick={() => {
+                        addBall({
+                          ...(extrasModal === 'wide' ? { is_wide: true } : { is_no_ball: true }),
+                          runs_scored: runs
+                        });
+                        setExtrasModal(null);
+                      }}
+                      className={`p-4 rounded-xl text-xl font-bold uppercase active:scale-95 transition-transform shadow-lg ${
+                        runs === 4 || runs === 6
+                          ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                          : 'bg-gray-800 hover:bg-gray-700 text-white'
+                      }`}
+                    >
+                      {extrasModal === 'wide' ? 'WD' : 'NB'}+{runs}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => setExtrasModal(null)} className="w-full mt-4 py-3 text-gray-400 hover:text-white text-sm font-bold uppercase tracking-widest transition">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           <button disabled={isMatchComplete || balls.length === 0} onClick={undoLastBall} className="w-full bg-gray-600 hover:bg-gray-500 text-black py-4 rounded-xl text-xl font-bold uppercase disabled:opacity-30 tracking-widest flex items-center justify-center gap-2 mb-6">
             <span>↩️</span> Undo Last Ball
