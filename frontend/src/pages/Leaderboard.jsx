@@ -19,7 +19,7 @@ export default function Leaderboard() {
     // Fetch list of tournaments for the dropdown filter
     fetch(`${API_BASE}/tournament/list`)
       .then(res => res.json())
-      .then(data => setTournaments(data || []))
+      .then(data => setTournaments(Array.isArray(data) ? data : []))
       .catch(err => console.error(err));
   }, []);
 

@@ -99,17 +99,24 @@ export default function Scoring() {
     try {
       const res = await fetch(`${API_BASE}/tournament/fixtures/${fixtureId}`);
       const data = await res.json();
+      
+      // Guard against error responses
+      if (!res.ok || data.error) {
+        console.error('Match data error:', data);
+        return;
+      }
+      
       setFixture(data);
       setTeamA(data.team_a);
       setTeamB(data.team_b);
 
       const scoreDict = { 1: null, 2: null };
-      if (data.match_scores) {
+      if (Array.isArray(data.match_scores)) {
         data.match_scores.forEach(s => { scoreDict[s.innings] = s; });
       }
       setScores(scoreDict);
 
-      if (data.ball_by_ball) {
+      if (Array.isArray(data.ball_by_ball)) {
         setBalls(data.ball_by_ball.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
       }
       setLoading(false);

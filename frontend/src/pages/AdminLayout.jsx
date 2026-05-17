@@ -15,7 +15,10 @@ export default function AdminLayout() {
         fetch(`${API_BASE}/auth/verify`, {
             headers: { 'Authorization': `Bearer ${token}` }
         })
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) throw new Error('Unauthorized');
+            return res.json();
+        })
         .then(data => {
             if (data.valid) setIsAuthed(true);
             else {
@@ -23,7 +26,10 @@ export default function AdminLayout() {
                 navigate('/login');
             }
         })
-        .catch(() => navigate('/login'));
+        .catch(() => {
+            localStorage.removeItem('adminToken');
+            navigate('/login');
+        });
     }, [navigate]);
 
     const handleLogout = () => {

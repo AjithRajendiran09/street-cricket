@@ -16,7 +16,7 @@ import { Trophy, Users, Calendar, BarChart2, Clock, Play, ShieldAlert, Activity 
 
 function App() {
   return (
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <div className="min-h-screen flex flex-col bg-cricket-dark pb-20 sm:pb-0">
         <header className="bg-cricket-green text-white p-4 shadow-lg sticky top-0 z-50">
           <div className="container mx-auto flex justify-between items-center">

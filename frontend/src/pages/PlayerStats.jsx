@@ -18,7 +18,13 @@ export default function PlayerStats() {
      }
      fetch(`${API_BASE}/tournament/player-stats?tournament_id=${activeTournamentId}`)
        .then(res => res.json())
-       .then(data => { setStats(data); setLoading(false); })
+       .then(data => {
+         setStats({
+           orangeCap: Array.isArray(data?.orangeCap) ? data.orangeCap : [],
+           purpleCap: Array.isArray(data?.purpleCap) ? data.purpleCap : []
+         });
+         setLoading(false);
+       })
        .catch(err => console.error(err));
    }, [activeTournamentId, navigate]);
 

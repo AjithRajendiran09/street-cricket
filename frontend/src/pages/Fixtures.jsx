@@ -20,6 +20,13 @@ export default function Fixtures({ isAdminMode = false }) {
       const res = await fetch(`${API_BASE}/tournament/fixtures?tournament_id=${activeTournamentId}`);
       let data = await res.json();
       
+      // Guard against error responses (e.g. 500 returns { error: "..." })
+      if (!Array.isArray(data)) {
+        console.error('Fixtures API error:', data);
+        setFixtures([]);
+        return;
+      }
+      
       // Compute League Match Numbers globally before prioritizing Live matches
       let leagueCounter = 1;
       data.forEach(f => {

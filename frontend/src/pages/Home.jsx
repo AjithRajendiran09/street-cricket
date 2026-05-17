@@ -12,7 +12,7 @@ export default function Home({ isAdminMode = false }) {
   useEffect(() => {
     fetch(`${API_BASE}/tournament/list`)
       .then(res => res.json())
-      .then(data => setTournaments(data || []))
+      .then(data => setTournaments(Array.isArray(data) ? data : []))
       .catch(err => console.error(err));
   }, []);
 

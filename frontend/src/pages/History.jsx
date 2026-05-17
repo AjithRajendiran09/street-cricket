@@ -16,6 +16,7 @@ export default function History() {
     fetch(`${API_BASE}/tournament/fixtures?tournament_id=${activeTournamentId}`)
       .then(res => res.json())
       .then(data => {
+        if (!Array.isArray(data)) return;
         const completed = data.filter(f => f.status === 'completed');
         // Group by match end time or created at date
         const grouped = completed.reduce((acc, curr) => {

@@ -18,7 +18,7 @@ export default function Points() {
     }
     fetch(`${API_BASE}/tournament/points-table?tournament_id=${activeTournamentId}`)
       .then(res => res.json())
-      .then(data => setTable(data))
+      .then(data => setTable(Array.isArray(data) ? data : []))
       .catch(err => console.error(err));
   }, []);
 
