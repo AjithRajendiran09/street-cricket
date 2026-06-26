@@ -184,16 +184,23 @@ export default function KnockoutBracket() {
 
                       {/* Action Links */}
                       <div className="px-3 py-2 bg-black/30 border-t border-gray-800 flex gap-2">
-                        {f.status === 'upcoming' && f.team_a && f.team_b && (
-                          <Link to={`/admin/toss/${f.id}`} className="flex-1 text-center bg-cricket-accent text-black text-xs font-bold py-1.5 rounded uppercase">Toss</Link>
-                        )}
-                        {f.status === 'toss' && (
-                          <Link to={`/admin/toss/${f.id}`} className="flex-1 text-center bg-cricket-lightGreen text-white text-xs font-bold py-1.5 rounded uppercase">Start</Link>
-                        )}
-                        {f.status === 'live' && (
-                          <Link to={`/admin/scoring/${f.id}`} className="flex-1 text-center bg-red-600 text-white text-xs font-bold py-1.5 rounded uppercase animate-pulse">Score</Link>
-                        )}
-                        <Link to={`/watch/${f.id}`} className="flex-1 text-center bg-blue-600/80 text-white text-xs font-bold py-1.5 rounded uppercase">Watch</Link>
+                        {(() => {
+                          const isPlaceholder = f.team_a?.team_name?.startsWith('TBD') || f.team_b?.team_name?.startsWith('TBD');
+                          return (
+                            <>
+                              {!isPlaceholder && f.status === 'upcoming' && f.team_a && f.team_b && (
+                                <Link to={`/admin/toss/${f.id}`} className="flex-1 text-center bg-cricket-accent text-black text-xs font-bold py-1.5 rounded uppercase">Toss</Link>
+                              )}
+                              {!isPlaceholder && f.status === 'toss' && (
+                                <Link to={`/admin/toss/${f.id}`} className="flex-1 text-center bg-cricket-lightGreen text-white text-xs font-bold py-1.5 rounded uppercase">Start</Link>
+                              )}
+                              {!isPlaceholder && f.status === 'live' && (
+                                <Link to={`/admin/scoring/${f.id}`} className="flex-1 text-center bg-red-600 text-white text-xs font-bold py-1.5 rounded uppercase animate-pulse">Score</Link>
+                              )}
+                              <Link to={`/watch/${f.id}`} className="flex-1 text-center bg-blue-600/80 text-white text-xs font-bold py-1.5 rounded uppercase">Watch</Link>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   );
