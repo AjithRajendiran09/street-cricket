@@ -211,10 +211,10 @@ npm run dev
 
 The admin panel is accessible at `/admin/leagues` and requires login.
 
-| Field    | Value       |
-|----------|-------------|
-| Username | `admin`     |
-| Password | `admin@123` |
+| Field    | Value                     |
+|----------|---------------------------|
+| Username | `admin`                   |
+| Password | *(Check your environment)*|
 
 > **Note:** Only one admin session is active at a time. A new login will invalidate the previous session.
 
