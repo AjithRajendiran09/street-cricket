@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import FormatSelector from './pages/FormatSelector';
 import Home from './pages/Home';
 import Teams from './pages/Teams';
 import Fixtures from './pages/Fixtures';
@@ -12,6 +13,7 @@ import Leaderboard from './pages/Leaderboard';
 import PlayerStats from './pages/PlayerStats';
 import Login from './pages/Login';
 import AdminLayout from './pages/AdminLayout';
+import KnockoutBracket from './pages/KnockoutBracket';
 import { Trophy, Users, Calendar, BarChart2, Clock, Play, ShieldAlert, Activity } from 'lucide-react';
 
 function App() {
@@ -24,7 +26,7 @@ function App() {
               <span className="text-cricket-accent text-2xl animate-pulse">🌪️</span> Hurricane Street Cricket
             </Link>
             <div className="hidden sm:flex space-x-6 overflow-x-auto whitespace-nowrap text-sm font-medium text-gray-200 uppercase tracking-wide">
-               <Link to="/teams" className="hover:text-white transition">Teams</Link>
+               <Link to="/dashboard" className="hover:text-white transition">Dashboard</Link>
                <Link to="/fixtures" className="hover:text-white transition">Fixtures</Link>
                <Link to="/points" className="hover:text-white transition">Points Table</Link>
                <Link to="/history" className="hover:text-white transition">History</Link>
@@ -39,6 +41,12 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             
+            {/* Format Selection — New Landing Page */}
+            <Route path="/" element={<FormatSelector />} />
+            
+            {/* Tournament Dashboard (format-aware) */}
+            <Route path="/dashboard" element={<Home isAdminMode={false} />} />
+
             {/* Admin Protected Architecture */}
             <Route path="/admin" element={<AdminLayout />}>
               <Route path="leagues" element={<Home isAdminMode={true} />} />
@@ -46,16 +54,17 @@ function App() {
               <Route path="fixtures" element={<Fixtures isAdminMode={true} />} />
               <Route path="toss/:fixtureId" element={<Toss />} />
               <Route path="scoring/:fixtureId" element={<Scoring />} />
+              <Route path="bracket" element={<KnockoutBracket />} />
             </Route>
 
             {/* Public Viewing Read-Only */}
-            <Route path="/" element={<Home isAdminMode={false} />} />
             <Route path="/fixtures" element={<Fixtures isAdminMode={false} />} />
             <Route path="/watch/:fixtureId" element={<Watch />} />
             <Route path="/points" element={<Points />} />
             <Route path="/history" element={<History />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/stats" element={<PlayerStats />} />
+            <Route path="/bracket" element={<KnockoutBracket />} />
           </Routes>
         </main>
 
@@ -69,7 +78,7 @@ function App() {
         <nav className="fixed bottom-0 left-0 right-0 bg-cricket-card border-t border-gray-800 sm:hidden z-50 flex justify-around py-2">
           <Link to="/" className="flex flex-col items-center p-2 text-gray-400 hover:text-cricket-accent transition">
             <Play size={20} />
-            <span className="text-[10px] mt-1 uppercase">Live</span>
+            <span className="text-[10px] mt-1 uppercase">Home</span>
           </Link>
           <Link to="/admin/leagues" className="flex flex-col items-center p-2 text-yellow-600 hover:text-yellow-400 transition relative">
             <ShieldAlert size={20} className="drop-shadow-md" />

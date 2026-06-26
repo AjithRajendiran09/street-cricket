@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
+import MatchPrediction from '../components/MatchPrediction';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
@@ -9,9 +10,13 @@ export default function Fixtures({ isAdminMode = false }) {
   const [loading, setLoading] = useState(false);
   const [leagueOvers, setLeagueOvers] = useState(2);
   const [playoffOvers, setPlayoffOvers] = useState(3);
+  const [knockoutOvers, setKnockoutOvers] = useState(2);
+  const [testOvers, setTestOvers] = useState(5);
+  const [unlimitedOvers, setUnlimitedOvers] = useState(false);
   const navigate = useNavigate();
   const [error, setError] = useState(null);
   const activeTournamentId = localStorage.getItem('active_tournament');
+  const activeFormat = localStorage.getItem('active_format') || 'league';
   const showError = (msg) => { setError(msg); setTimeout(() => setError(null), 4000); };
 
   const fetchFixtures = async () => {
@@ -135,6 +140,71 @@ export default function Fixtures({ isAdminMode = false }) {
     setLoading(false);
   };
 
+  const handleGenerateKnockout = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/knockout/generate-bracket`, {
+        method: 'POST',
+        headers: { 
+           'Content-Type': 'application/json',
+           'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
+        body: JSON.stringify({ tournament_id: activeTournamentId, overs: knockoutOvers })
+      });
+      if (res.ok) {
+        await fetchFixtures();
+        navigate('/admin/bracket');
+      } else {
+        const err = await res.json();
+        showError(err.error);
+      }
+    } catch (err) {
+      console.log(err);
+    }
+    setLoading(false);
+  };
+
+  const handleCreateTestMatch = async () => {
+    setLoading(true);
+    try {
+      // For test match, we create a fixture directly
+      // First get teams
+      const teamsRes = await fetch(`${API_BASE}/teams?tournament_id=${activeTournamentId}`);
+      const teams = await teamsRes.json();
+      
+      if (!Array.isArray(teams) || teams.length < 2) {
+        showError("Need at least 2 teams registered for a test match.");
+        setLoading(false);
+        return;
+      }
+
+      // Use first two teams (user can manage via team registration)
+      const overValue = unlimitedOvers ? null : testOvers;
+      
+      const res = await fetch(`${API_BASE}/tournament/generate-league`, {
+        method: 'POST',
+        headers: { 
+           'Content-Type': 'application/json',
+           'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
+        body: JSON.stringify({ 
+          defaultOvers: overValue || 5, 
+          tournament_id: activeTournamentId,
+          innings_count: 4,
+          max_overs_per_innings: overValue
+        })
+      });
+      if (res.ok) await fetchFixtures();
+      else {
+        const err = await res.json();
+        showError(err.error);
+      }
+    } catch (err) {
+      console.log(err);
+    }
+    setLoading(false);
+  };
+
   const renderAction = (f) => {
     if (!isAdminMode) return null; // Public users cannot operate Matches
 
@@ -152,15 +222,31 @@ export default function Fixtures({ isAdminMode = false }) {
     }
   };
 
+  const formatBadge = (f) => {
+    const type = f.match_type || 'League';
+    const inn = f.innings_count || 2;
+    if (inn === 4) return <span className="bg-blue-900 text-blue-400 border border-blue-700 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">Test</span>;
+    if (f.bracket_round) return <span className="bg-orange-900 text-orange-400 border border-orange-700 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">KO</span>;
+    return null;
+  };
+
   return (
     <div className="space-y-6">
       {error && <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-red-600 text-white font-bold px-6 py-3 rounded-lg shadow-2xl z-50 animate-fade-in text-center border border-red-800 tracking-wider flex items-center justify-center gap-2 w-[90%] max-w-sm"><span>⚠️</span> {error}</div>}
       <div className="flex flex-col md:flex-row justify-between items-center border-b border-gray-700 pb-2">
         <h1 className="text-3xl font-bold text-cricket-accent uppercase w-full md:w-auto text-center md:text-left mb-4 md:mb-0">Fixtures</h1>
+        {activeFormat === 'knockout' && fixtures.length > 0 && (
+          <Link to={isAdminMode ? '/admin/bracket' : '/bracket'} className="text-sm font-bold text-orange-400 hover:text-orange-300 uppercase tracking-wider bg-orange-900/30 px-4 py-2 rounded-lg border border-orange-700 transition">
+            View Bracket ⚔️
+          </Link>
+        )}
       </div>
       
       {isAdminMode && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-cricket-card p-4 rounded-xl border border-gray-800">
+        <>
+          {/* LEAGUE FORMAT CONTROLS */}
+          {activeFormat === 'league' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-cricket-card p-4 rounded-xl border border-gray-800">
               <div className="flex flex-col gap-2 p-2 relative">
                  <h3 className="font-bold text-lg mb-2 text-white">League Generation</h3>
                  <label className="text-sm text-gray-400">Total Overs per Match</label>
@@ -188,7 +274,45 @@ export default function Fixtures({ isAdminMode = false }) {
                      </button>
                  )}
               </div>
-          </div>
+            </div>
+          )}
+
+          {/* KNOCKOUT FORMAT CONTROLS */}
+          {activeFormat === 'knockout' && (
+            <div className="bg-cricket-card p-4 rounded-xl border border-orange-800 shadow-[0_0_15px_rgba(249,115,22,0.1)]">
+              <h3 className="font-bold text-lg mb-3 text-orange-400 uppercase tracking-wider">⚔️ Knockout Bracket Generation</h3>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm text-gray-400">Overs per Match</label>
+                <input disabled={fixtures.length > 0} type="number" min="1" value={knockoutOvers} onChange={e => setKnockoutOvers(Number(e.target.value))} className="bg-black text-white p-2 rounded border border-gray-700 disabled:opacity-50" />
+                <button onClick={handleGenerateKnockout} disabled={loading || fixtures.length > 0} className="mt-2 bg-orange-600 hover:bg-orange-500 text-white p-3 rounded font-bold uppercase disabled:opacity-50 transition">
+                  {fixtures.length > 0 ? 'Bracket Locked 🔒' : 'Generate Knockout Bracket'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TEST MATCH FORMAT CONTROLS */}
+          {activeFormat === 'test' && (
+            <div className="bg-cricket-card p-4 rounded-xl border border-blue-800 shadow-[0_0_15px_rgba(59,130,246,0.1)]">
+              <h3 className="font-bold text-lg mb-3 text-blue-400 uppercase tracking-wider">🏏 Test Match Setup</h3>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-3">
+                  <label className="text-sm text-gray-400 flex-1">Overs per Innings</label>
+                  <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                    <input type="checkbox" checked={unlimitedOvers} onChange={e => setUnlimitedOvers(e.target.checked)} className="accent-blue-500" />
+                    Unlimited
+                  </label>
+                </div>
+                {!unlimitedOvers && (
+                  <input disabled={fixtures.length > 0} type="number" min="1" value={testOvers} onChange={e => setTestOvers(Number(e.target.value))} className="bg-black text-white p-2 rounded border border-gray-700 disabled:opacity-50" />
+                )}
+                <button onClick={handleCreateTestMatch} disabled={loading || fixtures.length > 0} className="mt-2 bg-blue-600 hover:bg-blue-500 text-white p-3 rounded font-bold uppercase disabled:opacity-50 transition">
+                  {fixtures.length > 0 ? 'Matches Created 🔒' : 'Create Test Matches'}
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -196,7 +320,10 @@ export default function Fixtures({ isAdminMode = false }) {
         {fixtures.map(f => (
           <div key={f.id} className="bg-cricket-card rounded-xl border border-gray-800 overflow-hidden shadow-lg flex flex-col">
             <div className={`p-2 font-bold text-xs uppercase tracking-widest flex justify-between px-4 ${f.status === 'live' ? 'bg-red-800 text-white' : f.status === 'completed' ? 'bg-gray-800 text-gray-400' : 'bg-gray-700 text-gray-300'}`}>
-               <span>{f.match_type || 'League'} • {f.total_overs} Overs</span>
+               <span className="flex items-center gap-2">
+                 {f.match_type || 'League'} • {f.total_overs ? `${f.total_overs} Overs` : 'Unlimited'}
+                 {formatBadge(f)}
+               </span>
                <span>{f.status}</span>
             </div>
             <div className="p-4 flex flex-col flex-1 text-center justify-center">
@@ -210,11 +337,16 @@ export default function Fixtures({ isAdminMode = false }) {
                  </div>
               </div>
               <p className="text-gray-400 font-bold uppercase tracking-widest text-xs flex justify-between w-full">
-                 <span>{f.match_type === 'league' || f.match_type === 'League' ? `Match ${f.match_number || '?'}` : f.match_type} • {f.total_overs} Overs</span>
+                 <span>{f.match_type === 'league' || f.match_type === 'League' ? `Match ${f.match_number || '?'}` : f.match_type} • {f.total_overs ? `${f.total_overs} Overs` : '∞'}{(f.innings_count || 2) === 4 ? ' • 4 Inn' : ''}</span>
                  <span className={`px-2 py-1 rounded text-[10px] ${f.status === 'live' ? 'bg-red-600 text-white animate-pulse' : f.status === 'completed' ? 'bg-gray-700' : 'bg-blue-600'}`}>
                     {f.status}
                  </span>
               </p>
+               {f.status !== 'completed' && (
+                 <div className="mt-2 px-2">
+                   <MatchPrediction fixtureId={f.id} compact={true} />
+                 </div>
+               )}
             </div>
             
             <div className="p-4 bg-black/30 border-t border-gray-800 flex flex-col gap-2">

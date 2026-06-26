@@ -4,6 +4,7 @@ import { supabase } from '../supabase';
 import { Trophy } from 'lucide-react';
 import LivePlayerStats from '../components/LivePlayerStats';
 import FullScorecard from '../components/FullScorecard';
+import MatchPrediction from '../components/MatchPrediction';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
@@ -13,11 +14,12 @@ export default function Scoring() {
   const [fixture, setFixture] = useState(null);
   const [teamA, setTeamA] = useState(null);
   const [teamB, setTeamB] = useState(null);
-  const [scores, setScores] = useState({ 1: null, 2: null });
+  const [scores, setScores] = useState({ 1: null, 2: null, 3: null, 4: null });
   const [balls, setBalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [shake, setShake] = useState(false);
+  const [format, setFormat] = useState('league');
 
   // Player Tracking
   const [currentStriker, setCurrentStriker] = useState('');
@@ -25,6 +27,9 @@ export default function Scoring() {
 
   // Extras + Runs modal (for WD+runs, NB+runs)
   const [extrasModal, setExtrasModal] = useState(null); // null | 'wide' | 'noball'
+
+  // Follow-On Modal
+  const [followOnModal, setFollowOnModal] = useState(null); // null | followOnData object
 
   const showToast = (msg) => {
     setToast(msg);
@@ -63,7 +68,6 @@ export default function Scoring() {
         osc.frequency.exponentialRampToValueAtTime(40, now + 0.4);
         gain.gain.setValueAtTime(1, now);
 
-        // Tremolo for shattering sound
         const lfo = ctx.createOscillator();
         lfo.type = 'sine';
         lfo.frequency.value = 20;
@@ -100,7 +104,6 @@ export default function Scoring() {
       const res = await fetch(`${API_BASE}/tournament/fixtures/${fixtureId}`);
       const data = await res.json();
       
-      // Guard against error responses
       if (!res.ok || data.error) {
         console.error('Match data error:', data);
         return;
@@ -110,7 +113,12 @@ export default function Scoring() {
       setTeamA(data.team_a);
       setTeamB(data.team_b);
 
-      const scoreDict = { 1: null, 2: null };
+      // Determine format from tournament
+      const inningsCount = data.innings_count || 2;
+      if (inningsCount === 4) setFormat('test');
+      else setFormat('league');
+
+      const scoreDict = { 1: null, 2: null, 3: null, 4: null };
       if (Array.isArray(data.match_scores)) {
         data.match_scores.forEach(s => { scoreDict[s.innings] = s; });
       }
@@ -153,25 +161,28 @@ export default function Scoring() {
     };
   }, [fixtureId]);
 
+  // Helper: get players array from team
+  const getPlayers = (team) => {
+    if (!team) return [];
+    if (team.players && Array.isArray(team.players)) return team.players;
+    return [team.player1_name, team.player2_name, team.player3_name].filter(Boolean);
+  };
+
   const addBall = async (payload) => {
     if (!currentStriker || !currentBowler) {
       showError("Please select the current Striker and Bowler first!");
-      if (navigator.vibrate) navigator.vibrate([100, 50, 100]); // Error vibration
+      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
       return;
     }
 
-    if (navigator.vibrate) navigator.vibrate(40); // Native fast haptic feedback
+    if (navigator.vibrate) navigator.vibrate(40);
 
     payload.striker_name = currentStriker;
     payload.bowler_name = currentBowler;
 
     let prefixSpeech = "";
-    const activeForSpeech = scores[2] && !scores[2].is_completed ? scores[2] : (scores[1] && !scores[1].is_completed ? scores[1] : (scores[2] || scores[1]));
-    if (activeForSpeech && activeForSpeech.balls_bowled % 6 === 0) {
+    if (activeInningsScore && activeInningsScore.balls_bowled % 6 === 0) {
       prefixSpeech = `${currentBowler} to ${currentStriker}. `;
-      if (activeForSpeech.innings === 2 && activeForSpeech.balls_bowled === 0 && scores[1]) {
-        prefixSpeech += `Target is ${scores[1].runs + 1}. `;
-      }
     }
 
     if (payload.is_wicket) {
@@ -200,11 +211,10 @@ export default function Scoring() {
       speakAction(prefixSpeech + "Six runs! Absolute Maximum!");
     }
 
-    // --- SUPER-FAST OPTIMISTIC UI UPDATE ---
-    const activeInn = scores[2] && !scores[2].is_completed ? scores[2] : (scores[1] && !scores[1].is_completed ? scores[1] : (scores[2] || scores[1]));
-    if (activeInn) {
+    // --- OPTIMISTIC UI UPDATE ---
+    if (activeInningsScore) {
       const isLegal = !payload.is_wide && !payload.is_no_ball;
-      const optScore = { ...activeInn };
+      const optScore = { ...activeInningsScore };
       optScore.runs += (payload.runs_scored || 0);
       if (!isLegal) { optScore.runs += 1; optScore.extras += 1; }
       if (isLegal) { optScore.balls_bowled += 1; }
@@ -219,11 +229,11 @@ export default function Scoring() {
         is_wide: payload.is_wide,
         is_no_ball: payload.is_no_ball,
         striker_name: currentStriker,
+        innings: activeInningsScore.innings,
         created_at: new Date().toISOString()
       };
-      setBalls(prev => [optBall, ...prev].slice(0, 20)); // Keep UI fast
+      setBalls(prev => [optBall, ...prev].slice(0, 20));
     }
-    // ---------------------------------------
 
     try {
       const res = await fetch(`${API_BASE}/matches/ball/${fixtureId}`, {
@@ -239,37 +249,32 @@ export default function Scoring() {
       else {
         if (payload.is_wicket) {
           showToast("💥 WICKET!!");
-          setCurrentStriker(''); // Force select new batsman
+          setCurrentStriker('');
         }
 
-        if (result.updatedScore.is_completed) {
+        // Check for follow-on eligibility
+        if (result.followOnEligible && result.followOnData) {
+          setFollowOnModal(result.followOnData);
+          speakAction("Follow-on is available!", true);
+        }
+
+        if (result.updatedScore?.is_completed) {
+          const inningsCount = fixture?.innings_count || 2;
           setTimeout(() => showToast("🏁 INNINGS COMPLETED!"), payload.is_wicket ? 1500 : 0);
-          setCurrentStriker(''); // Clear for next innings
-          setCurrentBowler(''); // Clear for next innings
+          setCurrentStriker('');
+          setCurrentBowler('');
 
-          if (result.updatedScore.innings === 2) {
-            const inn1 = scores[1];
-            if (inn1) {
-              const inn1runs = inn1.runs;
-              const inn2runs = result.updatedScore.runs;
-              const t1 = teamA?.id === inn1.team_id ? teamA?.team_name : teamB?.team_name;
-              const t2 = teamA?.id === result.updatedScore.team_id ? teamA?.team_name : teamB?.team_name;
-
-              let finalString = "Match tied.";
-              if (inn1runs > inn2runs) finalString = `${t1} won by ${inn1runs - inn2runs} runs.`;
-              else if (inn2runs > inn1runs) finalString = `${t2} won the match.`;
-
-              // priority=true forcibly overrides iOS Safari queue silencing bugs!
-              speakAction(`Match Completed. ${finalString}`, true);
-            }
+          if (result.updatedScore.innings >= inningsCount) {
+            // Match over
+            speakAction("Match Completed!", true);
           } else {
-            const targetRuns = result.updatedScore.runs + 1;
-            speakAction(`First Innings Completed! The target is ${targetRuns} runs.`, true);
+            const nextInnings = result.updatedScore.innings + 1;
+            speakAction(`Innings ${result.updatedScore.innings} completed! Moving to innings ${nextInnings}.`, true);
           }
         }
-        else if (result.updatedScore.balls_bowled > 0 && result.updatedScore.balls_bowled % 6 === 0) {
+        else if (result.updatedScore?.balls_bowled > 0 && result.updatedScore.balls_bowled % 6 === 0) {
           setTimeout(() => showToast("🏏 OVER COMPLETED!"), payload.is_wicket ? 1500 : 0);
-          setCurrentBowler(''); // Force change bowler
+          setCurrentBowler('');
         }
 
         fetchMatchData();
@@ -279,41 +284,56 @@ export default function Scoring() {
     }
   };
 
-  const activeInningsScore = scores[2] && !scores[2].is_completed ? scores[2] : (scores[1] && !scores[1].is_completed ? scores[1] : (scores[2] || scores[1]));
-  const activeInningsNum = activeInningsScore ? activeInningsScore.innings : 1;
-  const calculatedTarget = activeInningsScore?.innings === 2 && scores[1] ? scores[1].runs + 1 : null;
-
-  const calculateWinProbability = () => {
-    try {
-      if (activeInningsNum !== 2 || !calculatedTarget || isMatchComplete || !activeInningsScore) return null;
-      const runsNeeded = calculatedTarget - (activeInningsScore.runs || 0);
-      const totalBalls = (fixture?.total_overs || 2) * 6;
-      const ballsLeft = totalBalls - (activeInningsScore.balls_bowled || 0);
-
-      if (runsNeeded <= 0) return 100;
-      if (ballsLeft <= 0) return 0;
-
-      const crr = activeInningsScore.balls_bowled > 0 ? (activeInningsScore.runs / activeInningsScore.balls_bowled) * 6 : ((calculatedTarget - 1) / totalBalls) * 6;
-      const rrr = (runsNeeded / ballsLeft) * 6;
-
-      let prob = 50 + (crr - rrr) * 8;
-      prob -= ((activeInningsScore.wickets || 0) * 6);
-      return Math.round(Math.max(5, Math.min(95, prob || 50)));
-    } catch {
-      return 50;
+  // Find active innings — the latest incomplete one
+  const activeInningsScore = useMemo(() => {
+    for (let i = 4; i >= 1; i--) {
+      if (scores[i] && !scores[i].is_completed) return scores[i];
     }
-  };
-  const battingProb = calculateWinProbability();
+    // If all completed, return the last one
+    for (let i = 4; i >= 1; i--) {
+      if (scores[i]) return scores[i];
+    }
+    return null;
+  }, [scores]);
 
-  // Clear selections when innings change (e.g., across refreshes or incoming real-time updates)
+  const activeInningsNum = activeInningsScore ? activeInningsScore.innings : 1;
+  const inningsCount = fixture?.innings_count || 2;
+  const isTestMatch = inningsCount === 4;
+
+  // Calculate target for the chasing innings
+  const calculatedTarget = useMemo(() => {
+    if (!activeInningsScore || !fixture) return null;
+    
+    if (isTestMatch) {
+      // In test: target only in the final innings
+      if (activeInningsScore.innings === inningsCount) {
+        const chasingTeamId = activeInningsScore.team_id;
+        let chasingPrevRuns = 0;
+        let settingRuns = 0;
+        [scores[1], scores[2], scores[3], scores[4]].filter(Boolean).forEach(s => {
+          if (s.innings === activeInningsScore.innings) return;
+          if (s.team_id === chasingTeamId) chasingPrevRuns += s.runs;
+          else settingRuns += s.runs;
+        });
+        return settingRuns - chasingPrevRuns + 1;
+      }
+      return null;
+    } else {
+      // League/Knockout: target in innings 2
+      if (activeInningsScore.innings === 2 && scores[1]) {
+        return scores[1].runs + 1;
+      }
+      return null;
+    }
+  }, [activeInningsScore, scores, fixture, isTestMatch, inningsCount]);
+
+  // Clear selections when innings change
   useEffect(() => {
     setCurrentStriker('');
     setCurrentBowler('');
   }, [activeInningsNum]);
 
-  // Restore striker/bowler from last ball when page loads or data refreshes
-  // This fixes the bug where navigating away mid-over and coming back
-  // leaves the bowler empty with the dropdown disabled (can't re-select)
+  // Restore striker/bowler from last ball
   useEffect(() => {
     if (!activeInningsScore || !balls || balls.length === 0) return;
 
@@ -325,9 +345,7 @@ export default function Scoring() {
 
     const lastBall = inningsBalls[0];
 
-    // Only auto-restore if the current selection is empty (e.g. after navigation)
     if (!currentBowler && lastBall.bowler_name) {
-      // Mid-over: restore the bowler since the dropdown would be disabled
       const isMidOver = activeInningsScore.balls_bowled > 0 && activeInningsScore.balls_bowled % 6 !== 0;
       if (isMidOver) {
         setCurrentBowler(lastBall.bowler_name);
@@ -335,7 +353,6 @@ export default function Scoring() {
     }
 
     if (!currentStriker && lastBall.striker_name) {
-      // Restore striker only if they are not out
       const outPlayerNames = inningsBalls
         .filter(b => b.is_wicket && b.striker_name)
         .map(b => b.striker_name);
@@ -352,12 +369,12 @@ export default function Scoring() {
 
   useEffect(() => {
     if (currentStriker && outPlayers.includes(currentStriker)) {
-      setCurrentStriker(''); // Force choose new batsman
+      setCurrentStriker('');
     }
   }, [outPlayers, currentStriker]);
 
   const undoLastBall = async () => {
-    if (navigator.vibrate) navigator.vibrate([30, 50, 30]); // Distinct undo vibration pattern
+    if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
     try {
       const res = await fetch(`${API_BASE}/matches/undo/${fixtureId}`, {
         method: 'POST',
@@ -374,6 +391,71 @@ export default function Scoring() {
     }
   };
 
+  // Declare innings handler (test match only)
+  const handleDeclare = async () => {
+    if (!window.confirm("Are you sure you want to DECLARE this innings? The batting team voluntarily ends their innings.")) return;
+    try {
+      const res = await fetch(`${API_BASE}/matches/declare/${fixtureId}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
+      });
+      const result = await res.json();
+      if (!res.ok) showError(result.error);
+      else {
+        showToast("📢 INNINGS DECLARED!");
+        speakAction("Innings declared!", true);
+        
+        if (result.followOnEligible && result.followOnData) {
+          setFollowOnModal(result.followOnData);
+        } else {
+          fetchMatchData();
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Follow-on handlers
+  const handleEnforceFollowOn = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/matches/enforce-follow-on/${fixtureId}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
+      });
+      if (res.ok) {
+        showToast("⚡ FOLLOW-ON ENFORCED!");
+        speakAction("Follow on enforced! The trailing team bats again!", true);
+      } else {
+        const err = await res.json();
+        showError(err.error);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setFollowOnModal(null);
+    fetchMatchData();
+  };
+
+  const handleDeclineFollowOn = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/matches/decline-follow-on/${fixtureId}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
+      });
+      if (res.ok) {
+        showToast("Normal order continues");
+      } else {
+        const err = await res.json();
+        showError(err.error);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setFollowOnModal(null);
+    fetchMatchData();
+  };
+
   if (loading) return <div className="p-8 text-center text-white">Loading...</div>;
 
   const isMatchComplete = fixture.status === 'completed';
@@ -385,14 +467,35 @@ export default function Scoring() {
   const battingTeam = battingTeamId === teamA?.id ? teamA : teamB;
   const bowlingTeam = bowlingTeamId === teamA?.id ? teamA : teamB;
 
-  const battingPlayers = [battingTeam?.player1_name, battingTeam?.player2_name, battingTeam?.player3_name].filter(Boolean);
-  const bowlingPlayers = [bowlingTeam?.player1_name, bowlingTeam?.player2_name, bowlingTeam?.player3_name].filter(Boolean);
-
-
+  const battingPlayers = getPlayers(battingTeam);
+  const bowlingPlayers = getPlayers(bowlingTeam);
 
   const formatOvers = (balls) => `${Math.floor(balls / 6)}.${balls % 6}`;
 
   const getMatchResult = () => {
+    if (isTestMatch) {
+      // Test match result
+      let teamARuns = 0, teamBRuns = 0;
+      [scores[1], scores[2], scores[3], scores[4]].filter(Boolean).forEach(s => {
+        if (s.team_id === teamA?.id) teamARuns += s.runs;
+        else teamBRuns += s.runs;
+      });
+
+      const allCompleted = [scores[1], scores[2], scores[3], scores[4]].filter(Boolean).every(s => s.is_completed);
+      const totalInnings = [scores[1], scores[2], scores[3], scores[4]].filter(s => s && s.is_completed).length;
+
+      if (teamARuns > teamBRuns && isMatchComplete) {
+        return `${getTeamName(teamA?.id)} won by ${teamARuns - teamBRuns} runs! 🏆`;
+      }
+      if (teamBRuns > teamARuns && isMatchComplete) {
+        return `${getTeamName(teamB?.id)} won by ${teamBRuns - teamARuns} runs! 🏆`;
+      }
+      if (teamARuns === teamBRuns && allCompleted) return "Match Tied! 🤝";
+      if (isMatchComplete && !allCompleted) return "Match Drawn 🤝";
+      return null;
+    }
+
+    // League/Knockout result
     if (!scores[1] || !scores[2]) return null;
     const inn1 = scores[1];
     const inn2 = scores[2];
@@ -412,17 +515,17 @@ export default function Scoring() {
     balls.forEach(b => {
       if (b.striker_name && !b.is_wide) {
         if (!playerPoints[b.striker_name]) playerPoints[b.striker_name] = 0;
-        playerPoints[b.striker_name] += (b.runs_scored || 0); // 1 pt per run
-        if (b.runs_scored === 4) playerPoints[b.striker_name] += 1; // Bonus
-        if (b.runs_scored === 6) playerPoints[b.striker_name] += 2; // Bonus
+        playerPoints[b.striker_name] += (b.runs_scored || 0);
+        if (b.runs_scored === 4) playerPoints[b.striker_name] += 1;
+        if (b.runs_scored === 6) playerPoints[b.striker_name] += 2;
       }
       if (b.bowler_name) {
         if (!playerPoints[b.bowler_name]) playerPoints[b.bowler_name] = 0;
         if (b.is_wicket && !['run_out', 'retired_hurt'].includes(b.wicket_type)) {
-          playerPoints[b.bowler_name] += 15; // 15 pts per wicket
+          playerPoints[b.bowler_name] += 15;
         }
         if ((b.runs_scored || 0) === 0 && !b.is_wide && !b.is_no_ball && (b.extras || 0) === 0 && !b.is_wicket) {
-          playerPoints[b.bowler_name] += 1; // 1 pt per dot ball
+          playerPoints[b.bowler_name] += 1;
         }
       }
     });
@@ -435,13 +538,17 @@ export default function Scoring() {
   const generateWhatsAppShare = () => {
     const matchRes = getMatchResult();
     const mvpStr = mvpPlayer ? `\n🌟 *Player of the Match:* ${mvpPlayer}` : '';
-    const t1Name = getTeamName(scores[1]?.team_id) || 'Team 1';
-    const t2Name = getTeamName(scores[2]?.team_id) || 'Team 2';
+    
+    let scoreLines = '';
+    for (let i = 1; i <= inningsCount; i++) {
+      if (scores[i]) {
+        const tName = getTeamName(scores[i].team_id);
+        scoreLines += `🏏 *${tName}* (Inn ${i}): ${scores[i].runs}/${scores[i].wickets} (${formatOvers(scores[i].balls_bowled)} ov)${scores[i].is_declared ? ' d' : ''}\n`;
+      }
+    }
 
-    const s1 = scores[1] ? `🏏 *${t1Name}*: ${scores[1].runs}/${scores[1].wickets} (${formatOvers(scores[1].balls_bowled)} ov)` : '';
-    const s2 = scores[2] ? `🏏 *${t2Name}*: ${scores[2].runs}/${scores[2].wickets} (${formatOvers(scores[2].balls_bowled)} ov)` : '';
-
-    const text = `🏆 *STREET CRICKET RESULTS* 🏆\n\n${s1}\n${s2}\n\n🔥 *${matchRes?.replace('🏆', '') || ''}*${mvpStr}\n\nFollow live leaderboard on the App!`;
+    const formatLabel = isTestMatch ? 'TEST MATCH' : 'STREET CRICKET';
+    const text = `🏆 *${formatLabel} RESULTS* 🏆\n\n${scoreLines}\n🔥 *${matchRes?.replace('🏆', '') || ''}*${mvpStr}\n\nFollow live leaderboard on the App!`;
 
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
@@ -450,6 +557,38 @@ export default function Scoring() {
   const ScoreBtn = ({ label, action, styleClass = "bg-gray-800 text-white" }) => (
     <button disabled={isMatchComplete} onClick={action} className={`p-4 rounded-xl text-xl font-bold uppercase active:scale-95 transition-transform shadow-lg ${styleClass} ${isMatchComplete && 'opacity-50'}`}>{label}</button>
   );
+
+  // Multi-innings score summary for test matches
+  const InningsSummaryBar = () => {
+    if (!isTestMatch) return null;
+    return (
+      <div className="flex gap-1 w-full mt-3">
+        {[1, 2, 3, 4].map(i => {
+          const s = scores[i];
+          const isActive = activeInningsScore?.innings === i;
+          return (
+            <div key={i} className={`flex-1 p-2 rounded-lg text-center transition-all ${
+              isActive ? 'bg-cricket-accent/20 border border-cricket-accent' :
+              s ? 'bg-gray-800 border border-gray-700' : 'bg-gray-900/50 border border-gray-800/50'
+            }`}>
+              <div className="text-[9px] text-gray-500 font-bold uppercase">Inn {i}</div>
+              {s ? (
+                <>
+                  <div className={`text-sm font-black ${isActive ? 'text-white' : 'text-gray-300'}`}>
+                    {s.runs}/{s.wickets}
+                  </div>
+                  <div className="text-[9px] text-gray-500 truncate">{getTeamName(s.team_id)}</div>
+                  {s.is_declared && <div className="text-[8px] text-blue-400 font-bold">DEC</div>}
+                </>
+              ) : (
+                <div className="text-xs text-gray-600">—</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className={`max-w-md mx-auto relative pb-20 ${shake ? 'animate-shake' : ''}`}>
@@ -460,11 +599,43 @@ export default function Scoring() {
         </div>
       )}
 
+      {/* Follow-On Modal */}
+      {followOnModal && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-gray-900 border-2 border-blue-500 rounded-2xl p-6 w-full max-w-sm shadow-[0_0_40px_rgba(59,130,246,0.3)] text-center">
+            <h3 className="text-2xl font-black text-blue-400 uppercase tracking-widest mb-4">⚡ Follow-On Available</h3>
+            <div className="space-y-2 mb-6">
+              <p className="text-gray-300 text-sm">
+                <span className="font-bold text-white">{getTeamName(followOnModal.teamAId)}</span> scored <span className="text-cricket-accent font-black text-lg">{followOnModal.teamAScore}</span>
+              </p>
+              <p className="text-gray-300 text-sm">
+                <span className="font-bold text-white">{getTeamName(followOnModal.teamBId)}</span> scored <span className="text-red-400 font-black text-lg">{followOnModal.teamBScore}</span>
+              </p>
+              <div className="bg-black rounded-lg p-3 border border-gray-700 mt-3">
+                <p className="text-red-400 font-bold text-lg">Deficit: {followOnModal.deficit} runs</p>
+                <p className="text-gray-500 text-xs uppercase tracking-widest mt-1">Threshold: {followOnModal.margin} runs</p>
+              </div>
+            </div>
+            <p className="text-gray-400 text-sm mb-4 uppercase tracking-wider font-bold">
+              Enforce follow-on? {getTeamName(followOnModal.teamBId)} will bat again.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={handleEnforceFollowOn} className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest rounded-xl transition shadow-lg">
+                ⚡ Enforce
+              </button>
+              <button onClick={handleDeclineFollowOn} className="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white font-bold uppercase tracking-widest rounded-xl transition">
+                Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-cricket-card p-4 rounded-t-xl border border-gray-800 border-b-0 shadow-lg mb-0 text-center relative overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cricket-accent to-cricket-lightGreen"></div>
         <h2 className="text-gray-400 uppercase text-xs font-bold tracking-widest mb-1">
-          {isMatchComplete ? 'Match Completed' : `Innings ${activeInningsNum}`} • {fixture.total_overs} Overs Match
+          {isMatchComplete ? 'Match Completed' : `Innings ${activeInningsNum}${isTestMatch ? `/${inningsCount}` : ''}`} • {fixture.total_overs ? `${fixture.total_overs} Overs` : 'Unlimited'} {isTestMatch ? 'Test' : ''} Match
         </h2>
         <div className="flex justify-between items-center text-sm font-bold mt-2">
           <div className={`flex flex-col flex-1 items-center ${battingTeamId === teamA?.id ? 'text-white' : 'text-gray-500'}`}>
@@ -475,6 +646,7 @@ export default function Scoring() {
             <span className="truncate w-full uppercase">{teamB?.team_name}</span>
           </div>
         </div>
+        <InningsSummaryBar />
       </div>
 
       {isMatchComplete ? (
@@ -493,27 +665,19 @@ export default function Scoring() {
           </p>
 
           <div className="flex justify-between items-center gap-4 text-left">
-            <div className="flex-1 bg-gray-900/80 p-4 rounded-xl border border-gray-800">
-              <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-2 truncate">{getTeamName(scores[1]?.team_id)}</p>
-              <p className="text-3xl font-black text-white">{scores[1]?.runs}<span className="text-lg font-bold text-gray-500">/{scores[1]?.wickets}</span></p>
-              <p className="text-xs text-gray-400 mt-1 font-bold">Overs: {formatOvers(scores[1]?.balls_bowled || 0)}</p>
-            </div>
-            <div className="text-gray-600 font-black italic text-sm">VS</div>
-            <div className="flex-1 bg-gray-900/80 p-4 rounded-xl border border-gray-800">
-              <p className="text-[10px] text-cricket-lightGreen font-black uppercase tracking-widest mb-2 truncate">{getTeamName(scores[2]?.team_id)}</p>
-              <p className="text-3xl font-black text-white">{scores[2]?.runs}<span className="text-lg font-bold text-gray-500">/{scores[2]?.wickets}</span></p>
-              <p className="text-xs text-gray-400 mt-1 font-bold">Overs: {formatOvers(scores[2]?.balls_bowled || 0)}</p>
-            </div>
+            {[1, 2, 3, 4].filter(i => scores[i]).map(i => (
+              <div key={i} className="flex-1 bg-gray-900/80 p-3 rounded-xl border border-gray-800">
+                <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-1 truncate">{getTeamName(scores[i]?.team_id)} {isTestMatch ? `(${i})` : ''}</p>
+                <p className="text-2xl font-black text-white">{scores[i]?.runs}<span className="text-sm font-bold text-gray-500">/{scores[i]?.wickets}</span></p>
+                <p className="text-xs text-gray-400 mt-1 font-bold">
+                  {formatOvers(scores[i]?.balls_bowled || 0)}
+                  {scores[i]?.is_declared && <span className="text-blue-400 ml-1">d</span>}
+                </p>
+              </div>
+            ))}
           </div>
 
-          <FullScorecard
-            fixture={fixture}
-            balls={balls}
-            scores={scores}
-            teamA={teamA}
-            teamB={teamB}
-            mvpPlayer={mvpPlayer}
-          />
+          <FullScorecard fixture={fixture} balls={balls} scores={scores} teamA={teamA} teamB={teamB} mvpPlayer={mvpPlayer} />
 
           <button onClick={generateWhatsAppShare} className="mt-8 w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-black uppercase tracking-widest py-4 rounded-xl transition-all shadow-[0_0_15px_rgba(37,211,102,0.4)] hover:scale-105 flex items-center justify-center gap-2 focus:outline-none">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" /></svg>
@@ -557,38 +721,21 @@ export default function Scoring() {
 
                 {calculatedTarget && !isMatchComplete && (() => {
                   const runsNeeded = calculatedTarget - activeInningsScore.runs;
-                  const totalBalls = fixture.total_overs * 6;
-                  const ballsLeft = totalBalls - activeInningsScore.balls_bowled;
-                  const crr = activeInningsScore.balls_bowled > 0 ? ((activeInningsScore.runs / activeInningsScore.balls_bowled) * 6).toFixed(2) : "0.00";
-                  const rrr = ballsLeft > 0 ? ((runsNeeded / ballsLeft) * 6).toFixed(2) : "N/A";
+                  const totalBalls = fixture.total_overs ? fixture.total_overs * 6 : null;
+                  const ballsLeft = totalBalls ? totalBalls - activeInningsScore.balls_bowled : null;
 
                   return (
                     <div className="w-full mt-3 flex flex-col items-center">
                       <div className="w-full text-center text-[15px] text-yellow-400 font-black bg-yellow-900/20 border-t border-b border-yellow-800/50 py-2 uppercase tracking-wide">
-                        Need {Math.max(0, runsNeeded)} runs in {Math.max(0, ballsLeft)} balls
-                      </div>
-                      <div className="flex gap-4 text-xs font-bold text-gray-400 uppercase tracking-widest mt-2">
-                        <span>CRR: {crr}</span>
-                        <span className="text-gray-700">|</span>
-                        <span>RRR: {rrr}</span>
+                        Need {Math.max(0, runsNeeded)} runs {ballsLeft !== null ? `in ${Math.max(0, ballsLeft)} balls` : ''}
                       </div>
                     </div>
                   );
                 })()}
 
-                {battingProb !== null && (
-                  <div className="w-full mt-4 px-2">
-                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-1">
-                      <span className="text-gray-400 truncate flex-1">{getTeamName(scores[1].team_id)} <span className="text-white">{100 - battingProb}%</span></span>
-                      <span className="text-yellow-400 truncate flex-1 text-right"><span className="text-white">{battingProb}%</span> {getTeamName(scores[2].team_id)}</span>
-                    </div>
-                    <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden flex shadow-inner">
-                      <div className="h-full bg-gray-600 transition-all duration-1000 ease-out border-r border-gray-900" style={{ width: `${100 - battingProb}%` }}></div>
-                      <div className="h-full bg-yellow-500 transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(234,179,8,1)] relative" style={{ width: `${battingProb}%` }}>
-                        <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
-                      </div>
-                    </div>
-                    <div className="text-[8px] text-center text-gray-600 uppercase tracking-widest mt-1">Live Win Predictor</div>
+                {!isTestMatch && activeInningsNum === 1 && !isMatchComplete && (
+                  <div className="w-full mt-4">
+                    <MatchPrediction fixtureId={fixtureId} compact={true} />
                   </div>
                 )}
 
@@ -635,6 +782,13 @@ export default function Scoring() {
             <ScoreBtn label="NB" action={() => setExtrasModal('noball')} styleClass="bg-purple-600 hover:bg-purple-500" />
             <ScoreBtn label="WK" action={() => addBall({ is_wicket: true, runs_scored: 0 })} styleClass="bg-red-600 hover:bg-red-500 animate-pulse text-white font-black" />
           </div>
+
+          {/* Declare Innings Button (Test Match Only) */}
+          {isTestMatch && !isMatchComplete && activeInningsScore && !activeInningsScore.is_completed && (
+            <button onClick={handleDeclare} className="w-full bg-blue-700 hover:bg-blue-600 text-white py-4 rounded-xl text-lg font-black uppercase tracking-widest flex items-center justify-center gap-2 mb-4 border border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)] transition">
+              📢 Declare Innings
+            </button>
+          )}
 
           {/* Extras + Runs Modal */}
           {extrasModal && (

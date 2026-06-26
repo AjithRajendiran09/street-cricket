@@ -1,7 +1,7 @@
 const supabase = require('../db/supabase');
 
 class TournamentService {
-    static async generateLeagueFixtures(defaultOvers = 2, tournament_id) {
+    static async generateLeagueFixtures(defaultOvers = 2, tournament_id, innings_count = 2, max_overs_per_innings = null) {
         if (!tournament_id) throw new Error("Tournament ID is required to generate fixtures");
 
         const { data: fixtures } = await supabase.from('fixtures').select('id').eq('tournament_id', tournament_id);
@@ -18,20 +18,22 @@ class TournamentService {
         
         for (let i = 0; i < N; i++) {
             for (let j = i + 1; j < N; j++) {
-                matches.push({ team_a: teamIds[i], team_b: teamIds[j] });
+                matches.push({
+                    team_a_id: teamIds[i],
+                    team_b_id: teamIds[j],
+                    total_overs: defaultOvers,
+                    status: 'upcoming',
+                    tournament_id: tournament_id,
+                    match_type: 'league',
+                    innings_count: innings_count,
+                    max_overs_per_innings: max_overs_per_innings
+                });
             }
         }
 
         matches.sort(() => Math.random() - 0.5);
 
-        const fixturesToInsert = matches.map(m => ({
-            team_a_id: m.team_a,
-            team_b_id: m.team_b,
-            total_overs: defaultOvers,
-            status: 'upcoming',
-            tournament_id: tournament_id,
-            match_type: 'League'
-        }));
+        const fixturesToInsert = matches;
 
         const { data: inserted, error: insertErr } = await supabase
             .from('fixtures')

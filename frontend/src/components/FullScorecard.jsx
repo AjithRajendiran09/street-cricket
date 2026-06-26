@@ -10,7 +10,7 @@ export default function FullScorecard({ fixture, balls, scores, teamA, teamB, mv
     if (!balls || !scores) return [];
     const innData = [];
     
-    for (let inn of [1, 2]) {
+    for (let inn of [1, 2, 3, 4]) {
       const sData = scores[inn];
       if (!sData) continue;
       const bData = balls.filter(b => b.innings === inn);

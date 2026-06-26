@@ -8,8 +8,12 @@ class ScoringEngine {
      */
     static processBall(state, event) {
         const { runs, wickets, balls_bowled, extras, innings, target } = state;
-        const { total_overs } = state; // Max overs
+        const { total_overs } = state; // Max overs (null = unlimited for test matches)
         const { runs_scored = 0, is_wide = false, is_no_ball = false, is_wicket = false } = event;
+
+        const format = state.format || 'league';
+        const innings_count = state.innings_count || 2;
+        const maxOversPerInnings = state.max_overs_per_innings || total_overs;
 
         let newRuns = runs;
         let newWickets = wickets;
@@ -18,8 +22,13 @@ class ScoringEngine {
         
         const maxWicketsAllowed = state.max_wickets || 3;
 
+        // Determine max balls — null/undefined means unlimited overs (test match)
+        const effectiveOvers = maxOversPerInnings || total_overs;
+        const maxBalls = effectiveOvers ? effectiveOvers * 6 : null;
+
         // Validation: cannot score if match/innings completed or wickets >= available players
-        if (state.is_completed || wickets >= maxWicketsAllowed || balls_bowled >= total_overs * 6) {
+        const oversExhausted = maxBalls !== null && balls_bowled >= maxBalls;
+        if (state.is_completed || wickets >= maxWicketsAllowed || oversExhausted) {
             throw new Error("Cannot add ball. Innings already completed.");
         }
 
@@ -53,14 +62,16 @@ class ScoringEngine {
         }
 
         let isCompleted = false;
+
         // Dynamic Termination -> ends instantly precisely when the exact number of physical team players are exhausted natively!
-        if (newWickets >= maxWicketsAllowed || newBallsBowled >= total_overs * 6) {
+        const newMaxBalls = maxBalls;
+        if (newWickets >= maxWicketsAllowed || (newMaxBalls !== null && newBallsBowled >= newMaxBalls)) {
             isCompleted = true;
         }
 
-        // Target reached for 2nd innings
-        if (innings === 2 && target !== undefined && newRuns >= target) {
-            isCompleted = true; // Match ends
+        // Target reached check (depends on format and innings)
+        if (target !== undefined && target !== null && newRuns >= target) {
+            isCompleted = true; // Match/innings ends — chasing team met target
         }
 
         return {

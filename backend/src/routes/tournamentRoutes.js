@@ -7,8 +7,8 @@ const router = express.Router();
 
 router.post('/generate-league', isAdmin, async (req, res) => {
     try {
-        const { defaultOvers, tournament_id } = req.body;
-        const fixtures = await TournamentService.generateLeagueFixtures(defaultOvers || 2, tournament_id);
+        const { defaultOvers, tournament_id, innings_count, max_overs_per_innings } = req.body;
+        const fixtures = await TournamentService.generateLeagueFixtures(defaultOvers || 2, tournament_id, innings_count || 2, max_overs_per_innings || null);
         res.status(201).json(fixtures);
     } catch (err) {
         res.status(400).json({ error: err.message });
@@ -147,10 +147,12 @@ router.get('/player-stats', async (req, res) => {
 
 router.post('/create', isAdmin, async (req, res) => {
     try {
-        const { name, ground } = req.body;
+        const { name, ground, format } = req.body;
+        const validFormats = ['league', 'knockout', 'test'];
+        const tournamentFormat = validFormats.includes(format) ? format : 'league';
         const { data, error } = await supabase
             .from('tournaments')
-            .insert({ name, ground })
+            .insert({ name, ground, format: tournamentFormat })
             .select()
             .single();
         if (error) throw new Error(error.message);
@@ -162,10 +164,10 @@ router.post('/create', isAdmin, async (req, res) => {
 
 router.get('/list', async (req, res) => {
     try {
-        const { data, error } = await supabase
-            .from('tournaments')
-            .select('*')
-            .order('created_at', { ascending: false });
+        const { format } = req.query;
+        let query = supabase.from('tournaments').select('*').order('created_at', { ascending: false });
+        if (format) query = query.eq('format', format);
+        const { data, error } = await query;
         if (error) throw new Error(error.message);
         res.json(data);
     } catch (err) {
