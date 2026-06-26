@@ -47,7 +47,8 @@ class TournamentService {
     static async getPointsTable(tournament_id) {
         if (!tournament_id) throw new Error("Tournament ID is required for Points Table");
 
-        const { data: teams } = await supabase.from('teams').select('*').eq('tournament_id', tournament_id);
+        const { data: allTeams } = await supabase.from('teams').select('*').eq('tournament_id', tournament_id);
+        const teams = allTeams.filter(t => !t.team_name.startsWith('TBD'));
         const { data: fixtures } = await supabase
             .from('fixtures')
             .select('*, match_scores(team_id, innings, runs, balls_bowled, extras)')

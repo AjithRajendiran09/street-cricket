@@ -208,6 +208,13 @@ export default function Fixtures({ isAdminMode = false }) {
   const renderAction = (f) => {
     if (!isAdminMode) return null; // Public users cannot operate Matches
 
+    // Prevent interactions with placeholder teams
+    const isPlaceholder = !f.team_a || !f.team_b || 
+                          f.team_a.team_name?.startsWith('TBD') || 
+                          f.team_b.team_name?.startsWith('TBD');
+    
+    if (isPlaceholder) return null;
+
     switch (f.status) {
       case 'upcoming':
         return <Link to={`/admin/toss/${f.id}`} className="bg-cricket-accent hover:bg-yellow-600 text-black px-4 py-2 rounded text-sm font-bold w-full mb-2 text-center uppercase">Do Toss</Link>;

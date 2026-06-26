@@ -135,7 +135,10 @@ router.get('/', async (req, res) => {
         if (!tournament_id) return res.json([]);
         const { data, error } = await supabase.from('teams').select('*').eq('tournament_id', tournament_id).order('created_at', { ascending: false });
         if (error) throw new Error(error.message);
-        res.json(data);
+        
+        // Filter out placeholder TBD teams
+        const filteredTeams = data.filter(t => !t.team_name.startsWith('TBD'));
+        res.json(filteredTeams);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
