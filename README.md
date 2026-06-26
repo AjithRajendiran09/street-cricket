@@ -7,23 +7,25 @@ A full-stack web application for managing and live-scoring street cricket tourna
 ## ✨ Features
 
 ### 🏏 Tournament Management
-- **Multi-tournament support** — Create and manage multiple independent tournaments (seasons)
-- **Automatic league fixture generation** — Round-robin fixtures auto-generated for all registered teams
-- **Playoff & Final generation** — Semi-finals and finals created from the points table standings
-- **Points table** — Auto-calculated with wins, losses, NRR (Net Run Rate), and tiebreakers
+- **Multi-Format Support** — Create League (round-robin), Knockout (single-elimination), or Test Match (4 innings) tournaments
+- **Automatic League Fixtures** — Round-robin fixtures auto-generated for all registered teams
+- **Knockout Bracket Generation** — Auto-generated tournament trees with dynamic byes and auto-advancing winners
+- **Playoff & Final Generation** — Semi-finals and finals created from the league points table standings
+- **Points Table** — Auto-calculated with wins, losses, NRR (Net Run Rate), and tiebreakers for League formats
 
 ### 📋 Team Management
-- Register teams with 2–3 players per team
+- **Format-Specific Player Limits** — Register 2–3 players for League, or up to 11 players for Knockout and Test matches
 - Teams scoped per tournament (same team name allowed across different tournaments)
-- Full CRUD operations on teams
+- Full CRUD operations on teams with dynamic player arrays
 
 ### 🎯 Live Scoring Engine
 - **Ball-by-ball scoring** — Record runs, wides, no-balls, wickets, and extras
 - **Striker & bowler tracking** — Per-ball attribution for individual stats
 - **Undo support** — Revert the last delivery if a mistake is made
-- **Super Over support** — Automatic super over flow for tied matches
+- **Super Over support** — Automatic super over flow for tied limited-overs matches
+- **Test Match Dynamics** — Support for 4 innings, unlimited overs, voluntary Declarations, and Follow-On enforcement
 - **Toss management** — Record toss winner and decision (bat/bowl)
-- **Innings transitions** — Automatic detection of innings completion (all out / overs done)
+- **Innings transitions** — Automatic detection of innings completion (all out / overs done / declared)
 
 ### 📺 Live Match Viewing (Public)
 - **Real-time scorecard** — Watch live matches with auto-refreshing scores
@@ -115,6 +117,7 @@ street-cricket/
 │   ├── schema.sql                    # Base database schema
 │   ├── migration_full_tournaments.sql # Tournament support migration
 │   ├── migration_player_stats.sql     # Player tracking migration
+│   ├── migration_multi_format.sql     # Knockout & Test match formats migration
 │   ├── test_e2e.js                   # End-to-end tests
 │   ├── test_playoffs_e2e.js          # Playoff flow tests
 │   └── .env                          # Backend env vars
@@ -153,6 +156,10 @@ cd street-cricket
 4. Run the player stats migration:
    ```sql
    -- Copy and execute the contents of backend/migration_player_stats.sql
+   ```
+5. Run the multi-format migration:
+   ```sql
+   -- Copy and execute the contents of backend/migration_multi_format.sql
    ```
 
 ### 3. Configure Environment Variables
@@ -256,9 +263,16 @@ All endpoints are prefixed with the backend URL (default: `http://localhost:5001
 | POST   | `/generate-final`    | ✅   | Generate the final fixture     |
 | GET    | `/fixtures`          | ❌   | Get fixtures for a tournament  |
 | GET    | `/fixtures/:id`      | ❌   | Get full fixture details       |
-| GET    | `/points-table`      | ❌   | Get points table               |
+| GET    | `/points-table`      | ❌   | Get league points table        |
 | GET    | `/player-stats`      | ❌   | Get Orange/Purple cap stats    |
 | GET    | `/leaderboard`       | ❌   | Get batting/bowling leaderboard|
+
+### Knockout — `/api/knockout`
+
+| Method | Endpoint                | Auth | Description                    |
+|--------|-------------------------|------|--------------------------------|
+| POST   | `/generate-bracket`     | ✅   | Generate elimination bracket   |
+| GET    | `/bracket/:tournament_id`| ❌  | Get full bracket hierarchy     |
 
 ---
 
@@ -271,13 +285,13 @@ All endpoints are prefixed with the backend URL (default: `http://localhost:5001
 │ id (PK)      │◄────│ tournament_id│     │ id (PK)      │
 │ name         │     │ id (PK)      │◄──┐ │ tournament_id│
 │ ground       │     │ team_name    │   │ │ team_a_id    │──►teams
-│ status       │     │ player1_name │   │ │ team_b_id    │──►teams
-│ created_at   │     │ player2_name │   │ │ total_overs  │
-└──────────────┘     │ player3_name │   │ │ toss_winner  │
-                     │ created_at   │   │ │ toss_decision│
-                     └──────────────┘   │ │ status       │
-                                        │ │ match_type   │
-                                        │ │ mom_player   │
+│ format       │     │ players (JSON)│   │ │ team_b_id    │──►teams
+│ status       │     │ player1_name │   │ │ total_overs  │
+│ created_at   │     │ player2_name │   │ │ innings_count│
+└──────────────┘     │ player3_name │   │ │ status       │
+                     │ created_at   │   │ │ match_type   │
+                     └──────────────┘   │ │ bracket_round│
+                                        │ │ next_fixture │
                                         │ └──────────────┘
                                         │        │
                               ┌─────────┘        │
@@ -294,8 +308,8 @@ All endpoints are prefixed with the backend URL (default: `http://localhost:5001
                      │ balls_bowled │   │ extras       │
                      │ extras       │   │ is_wide      │
                      │ is_completed │   │ is_no_ball   │
-                     └──────────────┘   │ is_wicket    │
-                                        │ wicket_type  │
+                     │ is_declared  │   │ is_wicket    │
+                     └──────────────┘   │ wicket_type  │
                                         │ striker_name │
                                         │ bowler_name  │
                                         └──────────────┘
