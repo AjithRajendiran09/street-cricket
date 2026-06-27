@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Pencil, Plus, X } from 'lucide-react';
+import { Pencil, Plus, X, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
@@ -12,6 +12,7 @@ const FORMAT_LIMITS = {
 
 export default function Teams() {
   const [teams, setTeams] = useState([]);
+  const [directory, setDirectory] = useState([]);
   const [playerInputs, setPlayerInputs] = useState(['', '']);
   const [teamName, setTeamName] = useState('');
   const [editId, setEditId] = useState(null);
@@ -34,11 +35,22 @@ export default function Teams() {
     }
   };
 
+  const fetchDirectory = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/teams/players/directory`);
+      const data = await res.json();
+      setDirectory(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     if (!activeTournamentId) {
        navigate('/');
     } else {
        fetchTeams();
+       fetchDirectory();
     }
   }, [activeTournamentId, navigate]);
 
@@ -75,6 +87,25 @@ export default function Teams() {
     const updated = [...playerInputs];
     updated[index] = value;
     setPlayerInputs(updated);
+  };
+
+  const handleSelectFromDirectory = (playerName) => {
+    // Check if already in inputs
+    if (playerInputs.some(p => p.trim().toLowerCase() === playerName.toLowerCase())) {
+        showError(`${playerName} is already in the team!`);
+        return;
+    }
+    // Find first empty slot
+    const emptyIndex = playerInputs.findIndex(p => p.trim() === '');
+    if (emptyIndex !== -1) {
+        updatePlayer(emptyIndex, playerName);
+    } else {
+        if (playerInputs.length < limits.max) {
+            setPlayerInputs([...playerInputs, playerName]);
+        } else {
+            showError(`Cannot add more than ${limits.max} players.`);
+        }
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -117,6 +148,7 @@ export default function Teams() {
         setPlayerInputs(['', '']);
         setEditId(null);
         fetchTeams();
+        fetchDirectory(); // Refresh directory in case a new player was typed
       } else {
         const err = await res.json();
         showError(err.error);
@@ -179,6 +211,32 @@ export default function Teams() {
               </button>
             )}
           </div>
+
+          {/* Player Directory (Saved Players) */}
+          {directory.length > 0 && (
+            <div className="bg-gray-900/50 border border-gray-800 rounded-lg p-3">
+               <div className="text-xs text-gray-500 font-bold uppercase tracking-widest flex items-center gap-2 mb-2">
+                  <Users size={14} /> Saved Players (Tap to add)
+               </div>
+               <div className="flex flex-wrap gap-2">
+                  {directory.map(p => {
+                     const isSelected = playerInputs.some(input => input.trim().toLowerCase() === p.toLowerCase());
+                     if (isSelected) return null; // hide if already added
+                     return (
+                        <button 
+                           key={p} 
+                           type="button" 
+                           onClick={() => handleSelectFromDirectory(p)}
+                           className="text-xs bg-gray-800 hover:bg-blue-600 text-gray-300 hover:text-white px-3 py-1.5 rounded-full border border-gray-700 transition"
+                        >
+                           {p}
+                        </button>
+                     );
+                  })}
+               </div>
+            </div>
+          )}
+
           {playerInputs.map((player, idx) => (
             <div key={idx} className="flex items-center gap-2">
               <span className="text-xs text-gray-500 font-bold w-6">P{idx + 1}</span>

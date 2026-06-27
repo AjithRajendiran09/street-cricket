@@ -1,6 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 
 export default function LivePlayerStats({ balls, activeInningsNum, currentStriker, currentBowler, battingTeam, bowlingTeam }) {
+  const [milestone, setMilestone] = useState(null);
+  const prevStatsRef = useRef({});
+
   const stats = useMemo(() => {
     if (!balls || !activeInningsNum) return null;
     
@@ -91,10 +94,59 @@ export default function LivePlayerStats({ balls, activeInningsNum, currentStrike
     return { activeBatsmen, upcoming, activeBowlers };
   }, [balls, activeInningsNum, currentStriker, currentBowler, battingTeam, bowlingTeam]);
 
+  useEffect(() => {
+    if (!stats) return;
+    let newMilestone = null;
+
+    stats.activeBatsmen.forEach(b => {
+      const prevRuns = prevStatsRef.current[b.name]?.runs || 0;
+      if (prevRuns < 50 && b.runs >= 50 && b.runs < 100) {
+        newMilestone = { type: 'HALF CENTURY', name: b.name, value: b.runs };
+      } else if (prevRuns < 100 && b.runs >= 100) {
+        newMilestone = { type: 'CENTURY', name: b.name, value: b.runs };
+      }
+      prevStatsRef.current[b.name] = { ...prevStatsRef.current[b.name], runs: b.runs };
+    });
+
+    stats.activeBowlers.forEach(b => {
+      const prevWickets = prevStatsRef.current[b.name]?.wickets || 0;
+      if (prevWickets < 3 && b.wickets >= 3) {
+        newMilestone = { type: '3-WICKET HAUL', name: b.name, value: b.wickets, suffix: 'Wickets' };
+      }
+      prevStatsRef.current[b.name] = { ...prevStatsRef.current[b.name], wickets: b.wickets };
+    });
+
+    if (newMilestone) {
+      setMilestone(newMilestone);
+      setTimeout(() => setMilestone(null), 6000);
+      
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(`What a moment! ${newMilestone.name} reaches a ${newMilestone.type}!`);
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+  }, [stats]);
+
   if (!stats) return null;
 
   return (
-    <div className="w-full bg-black/80 border border-gray-800 rounded-lg mt-4 overflow-hidden shadow-2xl font-mono">
+    <div className="w-full bg-black/80 border border-gray-800 rounded-lg mt-4 overflow-hidden shadow-2xl font-mono relative">
+      {/* MILESTONE BANNER */}
+      {milestone && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/90 backdrop-blur-md animate-fade-in pointer-events-none p-4">
+           <div className="text-7xl md:text-9xl animate-bounce mb-6 drop-shadow-2xl">🌟</div>
+           <div className="text-4xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 uppercase tracking-widest text-center drop-shadow-[0_0_30px_rgba(234,179,8,0.4)] px-4">
+              {milestone.type}
+           </div>
+           <div className="text-3xl md:text-5xl text-white font-black mt-6 uppercase tracking-widest text-center">
+              {milestone.name}
+           </div>
+           <div className="text-2xl md:text-4xl text-gray-400 mt-4 font-mono font-bold bg-gray-900/50 px-6 py-2 rounded-full border border-gray-700">
+              {milestone.value} {milestone.suffix || 'Runs'}
+           </div>
+        </div>
+      )}
+
       {/* BATTING TABLE */}
       <div className="w-full">
         <div className="bg-gray-900 border-b border-gray-800 px-3 py-1.5 flex text-[10px] uppercase font-black text-gray-500 tracking-widest">

@@ -158,4 +158,22 @@ router.delete('/:id', isAdmin, async (req, res) => {
     }
 });
 
+router.get('/players/directory', async (req, res) => {
+    try {
+        const { data, error } = await supabase.from('teams').select('players');
+        if (error) throw new Error(error.message);
+        
+        const allPlayers = new Set();
+        data.forEach(t => {
+            if (t.players && Array.isArray(t.players)) {
+                t.players.forEach(p => allPlayers.add(p.trim()));
+            }
+        });
+        
+        res.json(Array.from(allPlayers).sort());
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
