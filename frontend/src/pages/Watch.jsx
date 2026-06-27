@@ -159,6 +159,11 @@ export default function Watch() {
 
   const getTeamName = (id) => id === teamA?.id ? teamA?.team_name : (id === teamB?.id ? teamB?.team_name : '');
 
+  const battingTeamId = activeInningsScore?.team_id;
+  const bowlingTeamId = battingTeamId === teamA?.id ? teamB?.id : teamA?.id;
+  const battingTeam = battingTeamId === teamA?.id ? teamA : teamB;
+  const bowlingTeam = bowlingTeamId === teamA?.id ? teamA : teamB;
+
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-6">
       <div className="bg-cricket-card p-6 rounded-xl border border-gray-800 shadow-2xl relative overflow-hidden">
@@ -259,21 +264,21 @@ export default function Watch() {
                   <LivePlayerStats 
                       balls={balls} 
                       activeInningsNum={activeInningsScore?.innings} 
+                      battingTeam={battingTeam}
+                      bowlingTeam={bowlingTeam}
                   />
                )}
             </div>
         ) : <div className="text-center text-gray-500 py-10 uppercase tracking-widest">Match starting soon...</div>}
       </div>
 
-      {isMatchComplete && (
-         <FullScorecard 
-             fixture={fixture} 
-             balls={balls} 
-             scores={scores} 
-             teamA={teamA} 
-             teamB={teamB} 
-         />
-      )}
+      <FullScorecard 
+          fixture={fixture} 
+          balls={balls} 
+          scores={scores} 
+          teamA={teamA} 
+          teamB={teamB} 
+      />
 
       {/* AI Prediction Card — shown for non-completed non-test matches */}
       {!isMatchComplete && !isTestMatch && (
