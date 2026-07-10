@@ -232,7 +232,7 @@ export default function Scoring() {
         innings: activeInningsScore.innings,
         created_at: new Date().toISOString()
       };
-      setBalls(prev => [optBall, ...prev].slice(0, 20));
+      setBalls(prev => [optBall, ...prev]);
     }
 
     try {
